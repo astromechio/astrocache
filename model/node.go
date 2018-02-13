@@ -15,10 +15,11 @@ const (
 
 // Node defines a node in the network
 type Node struct {
-	NID     string `json:"nid"`
-	Address string `json:"address"`
-	Type    string `json:"type"`
-	PubKey  []byte `json:"pubKey"`
+	NID       string `json:"nid"`
+	Address   string `json:"address"`
+	Type      string `json:"type"`
+	PubKey    []byte `json:"pubKey"`
+	ParentNID string `json:"parentNid,omitempty"`
 }
 
 // NewNode creates a new node

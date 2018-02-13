@@ -1,4 +1,4 @@
-package model
+package actions
 
 // Action defines structs that can be called actions
 type Action interface {
