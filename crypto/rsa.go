@@ -11,6 +11,11 @@ import (
 	"math/big"
 )
 
+const (
+	// MasterKeyPairKID is the KID for the master node's keyPair
+	MasterKeyPairKID = "astro.key.masterkeypair"
+)
+
 // KeyPair stores a private/public pair to represent an AstroCache node
 type KeyPair struct {
 	Private *rsa.PrivateKey
@@ -32,6 +37,18 @@ func GenerateNewKeyPair() (*KeyPair, error) {
 	}
 
 	return pair, nil
+}
+
+// GenerateMasterKeyPair generates a keyPair for the master node
+func GenerateMasterKeyPair() (*KeyPair, error) {
+	keyPair, err := GenerateNewKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	keyPair.KID = MasterKeyPairKID
+
+	return keyPair, nil
 }
 
 // Encrypt performs rsaOAEP on the input bytes and returns an encrypted message
@@ -57,7 +74,7 @@ func (akp *KeyPair) Decrypt(src *Message) ([]byte, error) {
 	}
 
 	if src.KeyType != KeyTypePair {
-		return nil, fmt.Errorf("attempted to decrypt %s message with keyPair", src.KeyType)
+		return nil, fmt.Errorf("attempting to decrypt message encrypted with %s with key of type %s", src.KeyType, KeyTypePair)
 	}
 
 	if src.KID != akp.KID {
@@ -120,9 +137,9 @@ func (akp *KeyPair) Verify(src []byte, sig *Signature) bool {
 	return AstroSigVerified
 }
 
-// KeyPairFromPubKeyJSON unmarshals and de-serializes a SerializablePubKey from JSON so it can be used to encrypt or validate signatures
+// KeyPairFromPubKeyJSON unmarshals and de-serializes a serializablePubKey from JSON so it can be used to encrypt or validate signatures
 func KeyPairFromPubKeyJSON(src []byte) (*KeyPair, error) {
-	serialized := &SerializablePubKey{}
+	serialized := &serializablePubKey{}
 	if err := json.Unmarshal(src, &serialized); err != nil {
 		return nil, err
 	}
@@ -140,11 +157,11 @@ func KeyPairFromPubKeyJSON(src []byte) (*KeyPair, error) {
 	return keyPair, nil
 }
 
-// PubKeyJSON exports the KeyPair's pubKey to JSON using SerializablePubKey
+// PubKeyJSON exports the KeyPair's pubKey to JSON using serializablePubKey
 func (akp *KeyPair) PubKeyJSON() []byte {
 	base64N := Base64URLEncode(akp.Public.N.Bytes())
 
-	serializable := SerializablePubKey{
+	serializable := serializablePubKey{
 		N:   base64N,
 		E:   akp.Public.E,
 		KID: akp.KID,
@@ -155,14 +172,14 @@ func (akp *KeyPair) PubKeyJSON() []byte {
 	return json
 }
 
-// SerializablePubKey is a JSON-marshal-able version of rsa.Publickey
-type SerializablePubKey struct {
+// serializablePubKey is a JSON-marshal-able version of rsa.Publickey
+type serializablePubKey struct {
 	N   string `json:"N"`
 	E   int    `json:"E"`
 	KID string `json:"KID"`
 }
 
-func (spk *SerializablePubKey) deserialize() (*rsa.PublicKey, error) {
+func (spk *serializablePubKey) deserialize() (*rsa.PublicKey, error) {
 	realN := &big.Int{}
 	nBytes, err := Base64URLDecode(spk.N)
 	if err != nil {

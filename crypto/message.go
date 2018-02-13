@@ -4,8 +4,8 @@ import "encoding/json"
 
 // KeyTypePair and others represent the type of key used to encrypt or sign a message
 const (
-	KeyTypePair      = "astro+pair"
-	KeyTypeSymmetric = "astro+sym"
+	KeyTypePair      = "astro.key.pair"
+	KeyTypeSymmetric = "astro.key.sym"
 )
 
 // Message represents an encrypted message

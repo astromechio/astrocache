@@ -1,0 +1,139 @@
+package crypto
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+
+	"github.com/pkg/errors"
+)
+
+const (
+	symKeySize = 32
+	// GlobalSymKeyKID is the universal KID for the global symKey
+	GlobalSymKeyKID = "astro.key.mastersymkey"
+)
+
+// SymKey respresents a symmetric key
+type SymKey struct {
+	Key string `json:"key"`
+	KID string `json:"kid"`
+}
+
+// GenerateSymKey generates a new symmetric key
+func GenerateSymKey() (*SymKey, error) {
+	rawKey := make([]byte, symKeySize)
+	if _, err := rand.Read(rawKey); err != nil {
+		return nil, err
+	}
+
+	keyString := Base64URLEncode(rawKey)
+
+	kid := generateNewKID()
+
+	symKey := &SymKey{
+		Key: keyString,
+		KID: kid,
+	}
+
+	return symKey, nil
+}
+
+// GenerateGlobalSymKey generates the master sym key
+func GenerateGlobalSymKey() (*SymKey, error) {
+	symKey, err := GenerateSymKey()
+	if err != nil {
+		return nil, errors.Wrap(err, "GenerateGlobalSymKey failed to GenerateSymKey")
+	}
+
+	symKey.KID = GlobalSymKeyKID
+
+	return symKey, nil
+}
+
+// Encrypt encrypts data into a Message
+func (sk *SymKey) Encrypt(src []byte) (*Message, error) {
+	rawKey, err := sk.rawKey()
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(rawKey)
+	if err != nil {
+		return nil, err
+	}
+
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	iv := make([]byte, aead.NonceSize())
+	if _, err := rand.Read(iv); err != nil {
+		return nil, err
+	}
+
+	ivString := Base64URLEncode(iv)
+
+	encData := aead.Seal(nil, iv, src, nil)
+
+	m := &Message{
+		Data:    encData,
+		KID:     sk.KID,
+		KeyType: KeyTypeSymmetric,
+		IV:      ivString,
+	}
+
+	return m, nil
+}
+
+// Decrypt returns decrypted data from a Message
+func (sk *SymKey) Decrypt(src *Message) ([]byte, error) {
+	if src.KID != sk.KID {
+		return nil, fmt.Errorf("attempting to decrypt message with KID %s with symKey %s", src.KID, sk.KID)
+	}
+
+	if src.KeyType != KeyTypeSymmetric {
+		return nil, fmt.Errorf("attempting to decrypt message encrypted with %s with key of type %s", src.KeyType, KeyTypeSymmetric)
+	}
+
+	rawKey, err := sk.rawKey()
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(rawKey)
+	if err != nil {
+		return nil, err
+	}
+
+	iv, err := Base64URLDecode(src.IV)
+	if err != nil {
+		return nil, err
+	}
+
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	decData, err := aead.Open(nil, iv, src.Data, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return decData, nil
+}
+
+// JSON returns the JSON representation of the symKey
+func (sk *SymKey) JSON() []byte {
+	keyJSON, _ := json.Marshal(sk)
+
+	return keyJSON
+}
+
+func (sk *SymKey) rawKey() ([]byte, error) {
+	return Base64URLDecode(sk.Key)
+}
