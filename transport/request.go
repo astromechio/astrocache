@@ -29,6 +29,10 @@ func Post(url string, req requests.Request, res interface{}) error {
 		return err
 	}
 
+	if response.StatusCode != 200 {
+		return fmt.Errorf("Post (%s) returned non-200 status code %d", url, response.StatusCode)
+	}
+
 	resBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return errors.Wrap(err, "Post failed to ReadAll")
@@ -51,6 +55,10 @@ func Get(url string, req requests.Request, res interface{}) error {
 	response, err := http.DefaultClient.Do(getRequest)
 	if err != nil {
 		return err
+	}
+
+	if response.StatusCode != 200 {
+		return fmt.Errorf("Post (%s) returned non-200 status code %d", url, response.StatusCode)
 	}
 
 	resBody, err := ioutil.ReadAll(response.Body)
