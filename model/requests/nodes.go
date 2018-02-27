@@ -16,6 +16,7 @@ type NewNodeRequest struct {
 	Address  string `json:"address"`
 	NodeType string `json:"nodeType"`
 	PubKey   []byte `json:"pubKey"`
+	JoinCode string `json:"joinCode"`
 }
 
 // Path returns the path for a new node request
@@ -60,11 +61,15 @@ func (nr *NewNodeRequest) Verify() error {
 		return errors.New("nr.PubKey length is 0")
 	}
 
+	if len(nr.JoinCode) == 0 {
+		return errors.New("nr.JoinCode length is 0")
+	}
+
 	return nil
 }
 
 // NewNodeResponse contains everything a node needs to bootstrap istelf
 type NewNodeResponse struct {
 	*model.Node
-	GlobalKey *acrypto.Message `json:"globalKey"`
+	EncGlobalKey *acrypto.Message `json:"encGlobalKey"`
 }

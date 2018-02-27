@@ -10,15 +10,15 @@ import (
 // NodeAdded is a block value representing a new node in the network
 // GlobalKey is the global key encrypted with the new node's pubKey
 type NodeAdded struct {
-	Node      *model.Node      `json:"node"`
-	GlobalKey *acrypto.Message `json:"globalKey"`
+	Node         *model.Node      `json:"node"`
+	EncGlobalKey *acrypto.Message `json:"encGlobalKey"`
 }
 
 // NewNodeAdded creates a new NodeAdded
 func NewNodeAdded(node *model.Node, globalKey *acrypto.Message) *NodeAdded {
 	return &NodeAdded{
-		Node:      node,
-		GlobalKey: globalKey,
+		Node:         node,
+		EncGlobalKey: globalKey,
 	}
 }
 

@@ -36,3 +36,8 @@ func NotFound(w http.ResponseWriter) {
 func BadRequest(w http.ResponseWriter) {
 	http.Error(w, "Bad Request", http.StatusBadRequest)
 }
+
+// Forbidden responds with 403
+func Forbidden(w http.ResponseWriter) {
+	http.Error(w, "Forbidden", http.StatusForbidden)
+}

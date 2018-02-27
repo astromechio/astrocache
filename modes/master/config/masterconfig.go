@@ -1,6 +1,8 @@
-package master
+package config
 
 import (
+	"math/rand"
+
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/modes"
 )
@@ -8,7 +10,8 @@ import (
 // Config defines the configuration for a master node
 type Config struct {
 	*modes.BaseConfig
-	Nodes *NodeList
+	Nodes    *NodeList
+	JoinCode string
 }
 
 // NodeList defines the nodes a master looks after
@@ -33,6 +36,19 @@ func (nl *NodeList) WorkersForVerifierWithNID(nid string) []*model.Node {
 // AddVerifier adds a verifier to the nodeList
 func (nl *NodeList) AddVerifier(verifier *model.Node) {
 	nl.Verifiers = append(nl.Verifiers, verifier)
+}
+
+// RandomVerifier returns a random verifier node from the NodeList
+func (nl *NodeList) RandomVerifier() *model.Node {
+	if len(nl.Verifiers) == 0 {
+		return nil
+	} else if len(nl.Verifiers) == 1 {
+		return nl.Verifiers[0]
+	}
+
+	index := rand.Intn(len(nl.Verifiers))
+
+	return nl.Verifiers[index]
 }
 
 // AddWorker adds a worker to the nodeList

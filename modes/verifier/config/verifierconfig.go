@@ -1,4 +1,4 @@
-package verifier
+package config
 
 import (
 	"github.com/astromechio/astrocache/model"

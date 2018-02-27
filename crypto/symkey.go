@@ -134,6 +134,17 @@ func (sk *SymKey) JSON() []byte {
 	return keyJSON
 }
 
+// SymKeyFromJSON deserializes a key from JSON
+func SymKeyFromJSON(keyJSON []byte) (*SymKey, error) {
+	key := &SymKey{}
+
+	if err := json.Unmarshal(keyJSON, key); err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
 func (sk *SymKey) rawKey() ([]byte, error) {
 	return Base64URLDecode(sk.Key)
 }

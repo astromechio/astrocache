@@ -1,6 +1,8 @@
 package master
 
 import (
+	"crypto/rand"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -8,7 +10,9 @@ import (
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
+	"github.com/astromechio/astrocache/model/blockchain"
 	"github.com/astromechio/astrocache/modes"
+	"github.com/astromechio/astrocache/modes/master/config"
 	"github.com/pkg/errors"
 )
 
@@ -23,12 +27,19 @@ func StartMaster() {
 
 	router := router(config)
 
-	if err := http.ListenAndServe(":80", router); err != nil {
+	logger.LogInfo(fmt.Sprintf("to join the network, run `astrocache [worker|verifier] [node address] %s %s`\n", config.Self.Address, config.JoinCode))
+
+	logger.LogInfo("starting astrocache master node server on port 3000")
+	if err := http.ListenAndServe(":3000", router); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func generateConfig() (*Config, error) {
+func generateConfig() (*config.Config, error) {
+	if len(os.Args) < 3 {
+		return nil, errors.New("missing argument: address")
+	}
+
 	address := os.Args[2]
 
 	keyPair, err := acrypto.GenerateMasterKeyPair()
@@ -48,13 +59,27 @@ func generateConfig() (*Config, error) {
 		GlobalKey: globalKey,
 	}
 
-	config := &Config{
+	chain, err := blockchain.BrandNewChain(keyPair, globalKey, node)
+	if err != nil {
+		return nil, errors.Wrap(err, "generateConfig failed to BrandNewChain")
+	}
+
+	config := &config.Config{
 		BaseConfig: &modes.BaseConfig{
 			Self:   node,
 			KeySet: keySet,
+			Chain:  chain,
 		},
-		Nodes: &NodeList{},
+		Nodes:    &config.NodeList{},
+		JoinCode: generateJoinCode(),
 	}
 
 	return config, nil
+}
+
+func generateJoinCode() string {
+	bytes := make([]byte, 32)
+	rand.Read(bytes)
+
+	return acrypto.Base64URLEncode(bytes)
 }

@@ -3,6 +3,8 @@ package blockchain
 import (
 	"fmt"
 
+	"github.com/astromechio/astrocache/logger"
+
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/actions"
@@ -70,6 +72,7 @@ func (c *Chain) CommitBlockWithTempID(tempID, prevID string, newSig *acrypto.Sig
 		}
 	}
 
+	logger.LogInfo(fmt.Sprintf("*** Committing bock with ID %s ***", newBlock.ID))
 	c.Blocks = append(c.Blocks, newBlock)
 
 	return nil

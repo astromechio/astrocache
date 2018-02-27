@@ -6,21 +6,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
-	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/requests"
 	"github.com/pkg/errors"
 )
 
 // Post sends a POST request to a node with a request
-func Post(node *model.Node, req requests.Request, res interface{}) error {
-	reqURL := fmt.Sprintf("http://%s/%s", node.Address, req.Path())
+func Post(url string, req requests.Request, res interface{}) error {
 	reqJSON, err := json.Marshal(req)
 	if err != nil {
 		return errors.Wrap(err, "Post failed to Marshal")
 	}
 
-	postRequest, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewReader(reqJSON))
+	postRequest, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(reqJSON))
 	if err != nil {
 		return errors.Wrap(err, "Post failed to NewRequest")
 	}
@@ -43,10 +42,8 @@ func Post(node *model.Node, req requests.Request, res interface{}) error {
 }
 
 // Get sends a POST request to a node with a request
-func Get(node *model.Node, req requests.Request, res interface{}) error {
-	reqURL := fmt.Sprintf("http://%s/%s", node.Address, req.Path())
-
-	getRequest, err := http.NewRequest(http.MethodGet, reqURL, nil)
+func Get(url string, req requests.Request, res interface{}) error {
+	getRequest, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "Get failed to NewRequest")
 	}
@@ -66,4 +63,13 @@ func Get(node *model.Node, req requests.Request, res interface{}) error {
 	}
 
 	return nil
+}
+
+// URLFromAddressAndPath creates a URL from a root address and a path
+func URLFromAddressAndPath(addr, path string) string {
+	if !strings.HasPrefix(addr, "http://") {
+		addr = fmt.Sprintf("http://%s", addr)
+	}
+
+	return fmt.Sprintf("%s/%s", addr, path)
 }
