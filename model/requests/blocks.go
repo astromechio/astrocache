@@ -14,6 +14,7 @@ type ProposeBlockRequest struct {
 	TempID     string           `json:"tempID"`
 	Data       *acrypto.Message `json:"data"`
 	ActionType string           `json:"actionType"`
+	PrevID     string           `json:"prevID"`
 }
 
 // Path returns the path for a new node request
@@ -44,8 +45,13 @@ func (pb *ProposeBlockRequest) Verify() error {
 	if pb.Data == nil {
 		return errors.New("pb.Data is nil")
 	}
+
 	if pb.Data.KID == "" {
 		return errors.New("pb.Data.KID is empty")
+	}
+
+	if pb.PrevID == "" {
+		return errors.New("pb.PrevID is empty")
 	}
 
 	return nil
@@ -53,6 +59,6 @@ func (pb *ProposeBlockRequest) Verify() error {
 
 // ProposeBlockResponse contains everything a block needs to be committed
 type ProposeBlockResponse struct {
-	PrevID   string `json:"prevID"`
-	PrevHash []byte `json:"prevHash"`
+	PrevHash   []byte `json:"prevHash"`
+	IDMismatch bool   `json:"mismatch"`
 }

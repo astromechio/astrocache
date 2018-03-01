@@ -72,6 +72,8 @@ func AddVerifierNodeHandler(config *config.Config) http.HandlerFunc {
 			return
 		}
 
+		config.Nodes.AddVerifier(newNode)
+
 		transport.ReplyWithJSON(w, resp)
 	}
 }

@@ -28,8 +28,13 @@ func ProposeAddBlockHandler(chain *blockchain.Chain) http.HandlerFunc {
 
 		res, err := execute.AddPendingBlock(chain, config.KeySet, proposeReq)
 		if err != nil {
-			logger.LogError(errors.Wrap(err, "ProposeAddBlock failed to AddPendingBLock"))
-			transport.InternalServerError(w)
+			logger.LogWarn(errors.Wrap(err, "ProposeAddBlock failed to AddPendingBLock"))
+			if res != nil {
+				transport.ReplyWithConflictJSON(w, res)
+			} else {
+				transport.InternalServerError(w)
+			}
+
 			return
 		}
 

@@ -7,25 +7,34 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AddPendingBlock adds a proposed block to the chain
-func AddPendingBlock(chain *blockchain.Chain, keySet *acrypto.KeySet, req *requests.ProposeBlockRequest) (*requests.ProposeBlockResponse, error) {
+// AddPendingBlockFromRequest builds a proposed block and then attempts to add it to the chain
+func AddPendingBlockFromRequest(chain *blockchain.Chain, keySet *acrypto.KeySet, req *requests.ProposeBlockRequest) (*blockchain.Block, error) {
 	proposedBlock := &blockchain.Block{
 		ID:         req.TempID,
 		Data:       req.Data,
 		ActionType: req.ActionType,
+		PrevID:     req.PrevID,
 	}
 
-	prevBlock := chain.AddPendingBlock(proposedBlock, keySet)
-
-	prevHash, err := prevBlock.Hash()
+	err := AddPendingBlock(chain, keySet, proposedBlock)
 	if err != nil {
-		return nil, errors.Wrap(err, "AddPendingBlock failed to prevBlock.Hash")
+		return nil, errors.Wrap(err, "AddPendingBlockFromRequest failed to AddPendingBlock")
 	}
 
-	res := &requests.ProposeBlockResponse{
-		PrevID:   prevBlock.ID,
-		PrevHash: prevHash,
+	return proposedBlock, nil
+}
+
+// AddPendingBlock adds a proposed block to the chain
+func AddPendingBlock(chain *blockchain.Chain, keySet *acrypto.KeySet, block *blockchain.Block) error {
+	err := chain.AddPendingBlock(block, keySet)
+	if err != nil {
+		return errors.Wrap(err, "AddPendingBlock failed to chain.AddPendingBlock")
 	}
 
-	return res, nil
+	return nil
+}
+
+// CommitPendingBlock commits a pending block to the chain
+func CommitPendingBlock(chain *blockchain.Chain, keySet *acrypto.KeySet, block *blockchain.Block) error {
+	return chain.CommitBlockWithTempID(block.ID, block.PrevID, nil, keySet)
 }

@@ -18,19 +18,16 @@ type Chain struct {
 }
 
 // AddPendingBlock adds a block to the pending list and returns the potential prevBlock
-func (c *Chain) AddPendingBlock(block *Block, keySet *acrypto.KeySet) *Block {
-	var prevBlock *Block
+func (c *Chain) AddPendingBlock(block *Block, keySet *acrypto.KeySet) error {
+	prevBlock := c.LastBlock()
 
-	if len(c.Pending) > 0 {
-		prevBlock = c.Pending[len(c.Pending)-1]
-	} else {
-		prevBlock = c.Blocks[len(c.Blocks)-1]
-
+	if prevBlock.ID != block.ID {
+		return errors.New("AddPendingBlock failed to add block: block.PrevID did not match prevBlock.ID")
 	}
 
 	c.Pending = append(c.Pending, block)
 
-	return prevBlock
+	return nil
 }
 
 // CommitBlockWithTempID adds prepares a block for committing and then commits it
@@ -116,4 +113,22 @@ func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, no
 	}
 
 	return chain, nil
+}
+
+// LastBlock returns the last [pending | committed] block in the chain
+func (c *Chain) LastBlock() *Block {
+	var lastBlock *Block
+
+	if len(c.Pending) > 0 {
+		lastBlock = c.Pending[len(c.Pending)-1]
+	} else {
+		lastBlock = c.Blocks[len(c.Blocks)-1]
+	}
+
+	return lastBlock
+}
+
+// LastCommittedBlock returns the last block that has been committed
+func (c *Chain) LastCommittedBlock() *Block {
+	return c.Blocks[len(c.Blocks)-1]
 }

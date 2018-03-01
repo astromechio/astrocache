@@ -1,4 +1,4 @@
-package execute
+package send
 
 import (
 	acrypto "github.com/astromechio/astrocache/crypto"
@@ -17,9 +17,24 @@ func AddNodeToChain(chain *blockchain.Chain, keySet *acrypto.KeySet, verifier *m
 		return nil, errors.Wrap(err, "AddNodeToChain failed to NewBlockWithAction")
 	}
 
+	prevBlock := chain.LastBlock()
+
+	proposeBlockReq := requests.ProposeBlockRequest {
+		TempID: block.ID, 
+		Data: block.Data,
+		ActionType: block.ActionType,
+		PrevID: prevBlock.ID,
+	}
+
 	// handle the bootstrap case
 	if verifier == nil {
-		prevBlock := chain.AddPendingBlock(block, keySet)
+
+		err := chain.AddPendingBlock(block, keySet)
+		if err != nil {
+			return nil, errors.Wrap(err, "AddNodeToChain failed to AddPendingBlock")
+		}
+
+		execute.
 
 		if err := chain.CommitBlockWithTempID(block.ID, prevBlock.ID, nil, keySet); err != nil {
 			return nil, errors.Wrap(err, "AddNodeToChain failed to CommitBlockWithTempID")

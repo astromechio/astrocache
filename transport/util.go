@@ -22,6 +22,20 @@ func ReplyWithJSON(w http.ResponseWriter, value interface{}) {
 	w.Write(response)
 }
 
+// ReplyWithConflictJSON replies with json and 200
+func ReplyWithConflictJSON(w http.ResponseWriter, value interface{}) {
+	response, err := json.Marshal(value)
+	if err != nil {
+		logger.LogError(errors.Wrap(err, "ReplyWithJSON failed to Marshal"))
+		InternalServerError(w)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusConflict)
+	w.Write(response)
+}
+
 // InternalServerError respoonds with 500
 func InternalServerError(w http.ResponseWriter) {
 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
