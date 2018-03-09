@@ -16,9 +16,9 @@ func AddPendingBlockFromRequest(chain *blockchain.Chain, keySet *acrypto.KeySet,
 		PrevID:     req.PrevID,
 	}
 
-	err := AddPendingBlock(chain, keySet, proposedBlock)
+	err := chain.AddPendingBlock(proposedBlock, keySet)
 	if err != nil {
-		return nil, errors.Wrap(err, "AddPendingBlockFromRequest failed to AddPendingBlock")
+		return nil, errors.Wrap(err, "AddPendingBlockFromRequest failed to chain.AddPendingBlock")
 	}
 
 	return proposedBlock, nil
@@ -36,5 +36,10 @@ func AddPendingBlock(chain *blockchain.Chain, keySet *acrypto.KeySet, block *blo
 
 // CommitPendingBlock commits a pending block to the chain
 func CommitPendingBlock(chain *blockchain.Chain, keySet *acrypto.KeySet, block *blockchain.Block) error {
-	return chain.CommitBlockWithTempID(block.ID, block.PrevID, nil, keySet)
+	// block.Signature can be nil
+	if err := chain.CommitBlockWithTempID(block.ID, block.PrevID, block.Signature, keySet); err != nil {
+		return errors.Wrap(err, "CommitPendingBlock failed to CommitBlockWithTempID")
+	}
+
+	return nil
 }

@@ -2,6 +2,7 @@ package send
 
 import (
 	acrypto "github.com/astromechio/astrocache/crypto"
+	"github.com/astromechio/astrocache/execute"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/actions"
@@ -18,26 +19,16 @@ func AddNodeToChain(chain *blockchain.Chain, keySet *acrypto.KeySet, verifier *m
 	}
 
 	prevBlock := chain.LastBlock()
-
-	proposeBlockReq := requests.ProposeBlockRequest {
-		TempID: block.ID, 
-		Data: block.Data,
-		ActionType: block.ActionType,
-		PrevID: prevBlock.ID,
-	}
+	block.PrevID = prevBlock.ID
 
 	// handle the bootstrap case
 	if verifier == nil {
-
-		err := chain.AddPendingBlock(block, keySet)
-		if err != nil {
+		if err := execute.AddPendingBlock(chain, keySet, block); err != nil {
 			return nil, errors.Wrap(err, "AddNodeToChain failed to AddPendingBlock")
 		}
 
-		execute.
-
-		if err := chain.CommitBlockWithTempID(block.ID, prevBlock.ID, nil, keySet); err != nil {
-			return nil, errors.Wrap(err, "AddNodeToChain failed to CommitBlockWithTempID")
+		if err := execute.CommitPendingBlock(chain, keySet, block); err != nil {
+			return nil, errors.Wrap(err, "AddNodeToChain failed to CommitBlockToChain")
 		}
 	} else {
 		logger.LogWarn("Verifier node block mining not yet implemented")

@@ -32,16 +32,22 @@ func (c *Chain) AddPendingBlock(block *Block, keySet *acrypto.KeySet) error {
 
 // CommitBlockWithTempID adds prepares a block for committing and then commits it
 // If newSig is nil, we are committing this block and therefore must prepare it
-func (c *Chain) CommitBlockWithTempID(tempID, prevID string, newSig *acrypto.Signature, keySet *acrypto.KeySet) error {
-	prevBlock := c.Blocks[len(c.Blocks)-1]
-	if prevBlock.ID != prevID {
-		return fmt.Errorf("CommitBlockWithTempID attempted to commit block with prevID %s, but last committed block has ID %s", prevID, prevBlock.ID)
-	}
-
+func (c *Chain) CommitBlockWithID(tempID, prevID string, newSig *acrypto.Signature, keySet *acrypto.KeySet) error {
+	var prevBlock *Block
 	var newBlock *Block
+	isNextBlock := false
+
 	for i, b := range c.Pending {
 		if b.ID == tempID {
 			newBlock = c.Pending[i]
+
+			if i == 0 {
+				prevBlock = c.Blocks[len(c.Blocks)-1]
+				isNextBlock = true
+			} else {
+				prevBlock = c.Pending[i-1]
+			}
+
 			break
 		}
 	}
