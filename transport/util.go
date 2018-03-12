@@ -22,18 +22,21 @@ func ReplyWithJSON(w http.ResponseWriter, value interface{}) {
 	w.Write(response)
 }
 
-// ReplyWithConflictJSON replies with json and 200
-func ReplyWithConflictJSON(w http.ResponseWriter, value interface{}) {
-	response, err := json.Marshal(value)
-	if err != nil {
-		logger.LogError(errors.Wrap(err, "ReplyWithJSON failed to Marshal"))
-		InternalServerError(w)
-		return
-	}
+// Ok replies with 200
+func Ok(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusConflict)
-	w.Write(response)
+// Created replies with 201
+func Created(w http.ResponseWriter) {
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("Created"))
+}
+
+// Conflict replies with 409
+func Conflict(w http.ResponseWriter) {
+	http.Error(w, "Conflict", http.StatusConflict)
 }
 
 // InternalServerError respoonds with 500

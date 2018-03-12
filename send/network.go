@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/astromechio/astrocache/model/requests"
-	"github.com/astromechio/astrocache/modes"
+	"github.com/astromechio/astrocache/server"
 	"github.com/astromechio/astrocache/transport"
 )
 
 // JoinNetwork requests that the current node be added to a network
-func JoinNetwork(config *modes.BaseConfig, masterAddr, joinCode string) (*requests.NewNodeResponse, error) {
+func JoinNetwork(config *server.Config, masterAddr, joinCode string) (*requests.NewNodeResponse, error) {
 	request := &requests.NewNodeRequest{
 		Address:  config.Self.Address,
 		NodeType: config.Self.Type,

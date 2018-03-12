@@ -13,72 +13,74 @@ import (
 
 // Chain represents a blockchain
 type Chain struct {
-	Blocks  []*Block
-	Pending []*Block
+	Blocks     []*Block
+	Proposed   *Block
+	WorkerChan chan (*NewBlockJob) // WorkerChan is used by verifier_chainworker as the synchronization method for mining and verifying new blocks
 }
 
-// AddPendingBlock adds a block to the pending list and returns the potential prevBlock
-func (c *Chain) AddPendingBlock(block *Block, keySet *acrypto.KeySet) error {
+// NewBlockJob represents the intent to add a new block
+type NewBlockJob struct {
+	Block      *Block
+	ResultChan chan (error)
+}
+
+// AddNewBlock adds a block to the pending list and returns the potential prevBlock
+func (c *Chain) AddNewBlock(block *Block) chan (error) {
+	errChan := make(chan error, 1)
+
+	job := &NewBlockJob{
+		Block:      block,
+		ResultChan: errChan,
+	}
+
+	c.WorkerChan <- job
+	return errChan
+}
+
+// SetProposedBlock checks and then sets the proposed block
+func (c *Chain) SetProposedBlock(block *Block) error {
 	prevBlock := c.LastBlock()
 
-	if prevBlock.ID != block.ID {
-		return errors.New("AddPendingBlock failed to add block: block.PrevID did not match prevBlock.ID")
+	if prevBlock == nil {
+		if block.ID != genesisBlockID {
+			return fmt.Errorf("SetProposedBlock tried to propose block with nil prevBlock and non-genesis ID %q", block.ID)
+		}
+	} else {
+		if prevBlock.ID != block.PrevID {
+			return errors.New("AddPendingBlock failed to add block: block.PrevID did not match prevBlock.ID")
+		}
 	}
 
-	c.Pending = append(c.Pending, block)
+	c.Proposed = block
 
 	return nil
 }
 
-// CommitBlockWithTempID adds prepares a block for committing and then commits it
-// If newSig is nil, we are committing this block and therefore must prepare it
-func (c *Chain) CommitBlockWithID(tempID, prevID string, newSig *acrypto.Signature, keySet *acrypto.KeySet) error {
-	var prevBlock *Block
-	var newBlock *Block
-	isNextBlock := false
+// CommitProposedBlock verifies and commits a block
+func (c *Chain) CommitProposedBlock(keySet *acrypto.KeySet) error {
+	prevBlock := c.LastBlock()
 
-	for i, b := range c.Pending {
-		if b.ID == tempID {
-			newBlock = c.Pending[i]
-
-			if i == 0 {
-				prevBlock = c.Blocks[len(c.Blocks)-1]
-				isNextBlock = true
-			} else {
-				prevBlock = c.Pending[i-1]
-			}
-
-			break
-		}
+	// Verify handles the genesis case
+	if err := c.Proposed.Verify(keySet, prevBlock); err != nil {
+		return errors.Wrap(err, "CommitProposedBlock failed to block.Verify")
 	}
 
-	if newBlock == nil {
-		return fmt.Errorf("CommitBlockWithTempID unable to find pending block with tempID %s", tempID)
-	}
+	logger.LogInfo(fmt.Sprintf("*** Committing bock with ID %s ***", c.Proposed.ID))
 
-	// if we are the committer
-	if newSig == nil {
-		newBlock.prepareForCommit(keySet.KeyPair, prevBlock)
-	} else {
-		// if we are not the committer
-		prevHash, err := prevBlock.Hash()
-		if err != nil {
-			return errors.Wrap(err, "CommitBlockWithTempID failed to prevBlock.Hash")
-		}
-
-		newBlock.ID = acrypto.Base64URLEncode(prevHash)
-		newBlock.Signature = newSig
-		newBlock.PrevID = prevID
-
-		if err := newBlock.Verify(keySet, prevBlock); err != nil {
-			return errors.Wrap(err, "CommitBlockWithTempID failed to block.Verify")
-		}
-	}
-
-	logger.LogInfo(fmt.Sprintf("*** Committing bock with ID %s ***", newBlock.ID))
-	c.Blocks = append(c.Blocks, newBlock)
+	c.Blocks = append(c.Blocks, c.Proposed)
+	c.Proposed = nil
 
 	return nil
+}
+
+// EmptyChain creates an enpty chain
+func EmptyChain() *Chain {
+	chain := &Chain{
+		Blocks:     []*Block{},
+		WorkerChan: make(chan *NewBlockJob, 2),
+	}
+
+	return chain
 }
 
 // BrandNewChain creates a fresh chain using the master keyPair
@@ -97,7 +99,7 @@ func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, no
 	}
 
 	if nodeKeyPair.KID != masterKeyPair.KID || node.Type != model.NodeTypeMaster {
-		return nil, fmt.Errorf("attempted to create a new chain with a non-master node")
+		return nil, fmt.Errorf("BrandNewChain attempted to create a new chain with a non-master node or keypair")
 	}
 
 	globalKeyJSON := globalKey.JSON()
@@ -114,27 +116,19 @@ func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, no
 		return nil, errors.Wrap(err, "BrandNewChain failed to NewBlockWithAction")
 	}
 
-	chain := &Chain{
-		Blocks: []*Block{genesis},
-	}
+	chain := EmptyChain()
+
+	// if this fails in the worker, we'll have to catch it and fatal
+	chain.AddNewBlock(genesis)
 
 	return chain, nil
 }
 
-// LastBlock returns the last [pending | committed] block in the chain
+// LastBlock returns the last block in the chain
 func (c *Chain) LastBlock() *Block {
-	var lastBlock *Block
-
-	if len(c.Pending) > 0 {
-		lastBlock = c.Pending[len(c.Pending)-1]
-	} else {
-		lastBlock = c.Blocks[len(c.Blocks)-1]
+	if len(c.Blocks) == 0 {
+		return nil
 	}
 
-	return lastBlock
-}
-
-// LastCommittedBlock returns the last block that has been committed
-func (c *Chain) LastCommittedBlock() *Block {
 	return c.Blocks[len(c.Blocks)-1]
 }

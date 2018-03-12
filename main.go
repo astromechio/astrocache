@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/astromechio/astrocache/modes/master"
-	"github.com/astromechio/astrocache/modes/verifier"
-	"github.com/astromechio/astrocache/modes/worker"
+	"github.com/astromechio/astrocache/server/master"
+	"github.com/astromechio/astrocache/server/verifier"
+	"github.com/astromechio/astrocache/server/worker"
 )
 
 func main() {

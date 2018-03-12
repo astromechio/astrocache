@@ -26,7 +26,7 @@ func Post(url string, req requests.Request, res interface{}) error {
 
 	response, err := http.DefaultClient.Do(postRequest)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Post failed to Do")
 	}
 
 	if response.StatusCode != 200 {
@@ -38,8 +38,10 @@ func Post(url string, req requests.Request, res interface{}) error {
 		return errors.Wrap(err, "Post failed to ReadAll")
 	}
 
-	if err := json.Unmarshal(resBody, res); err != nil {
-		return errors.Wrap(err, "Post failed to Unmarshal")
+	if res != nil {
+		if err := json.Unmarshal(resBody, res); err != nil {
+			return errors.Wrap(err, "Post failed to Unmarshal")
+		}
 	}
 
 	return nil
@@ -54,7 +56,7 @@ func Get(url string, req requests.Request, res interface{}) error {
 
 	response, err := http.DefaultClient.Do(getRequest)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Get failed to Do")
 	}
 
 	if response.StatusCode != 200 {
@@ -66,8 +68,10 @@ func Get(url string, req requests.Request, res interface{}) error {
 		return errors.Wrap(err, "Get failed to ReadAll")
 	}
 
-	if err := json.Unmarshal(resBody, res); err != nil {
-		return errors.Wrap(err, "Get failed to Unmarshal")
+	if res != nil {
+		if err := json.Unmarshal(resBody, res); err != nil {
+			return errors.Wrap(err, "Get failed to Unmarshal")
+		}
 	}
 
 	return nil

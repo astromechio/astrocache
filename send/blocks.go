@@ -1,48 +1,36 @@
 package send
 
 import (
-	"bytes"
 	"fmt"
 
-	acrypto "github.com/astromechio/astrocache/crypto"
-	"github.com/astromechio/astrocache/execute"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
-	"github.com/astromechio/astrocache/model/actions"
 	"github.com/astromechio/astrocache/model/blockchain"
 	"github.com/astromechio/astrocache/model/requests"
 	"github.com/astromechio/astrocache/transport"
 	"github.com/pkg/errors"
 )
 
-// ProposeBlockWithAction proposes a block and decides if the verifiers will accept it
-func ProposeBlockWithAction(verifiers []*model.Node, action actions.Action, keySet *acrypto.KeySet, chain *blockchain.Chain) (*blockchain.Block, error) {
-	block, err := blockchain.NewBlockWithAction(keySet.GlobalKey, action)
-	if err != nil {
-		return nil, errors.Wrap(err, "ProposeBlockWithAction failed to NewBlockWithAction")
-	}
-
-	prevBlock := chain.LastBlock()
-	block.PrevID = prevBlock.ID
-
+// ProposeBlockToVerifiers proposes a block and decides if the verifiers will accept it
+func ProposeBlockToVerifiers(block *blockchain.Block, verifiers []*model.Node, thisNode *model.Node) error {
 	req := &requests.ProposeBlockRequest{
-		TempID:     block.ID,
-		Data:       block.Data,
-		ActionType: action.ActionType(),
-		PrevID:     block.PrevID,
+		Block:    block,
+		MinerNID: thisNode.NID,
 	}
 
-	resultChan := make(chan bool)
-
-	prevHash, err := prevBlock.Hash()
-	if err != nil {
-		return nil, errors.Wrap(err, "ProposeBlockWithAction failed to prevBlock.Hash()")
+	// handle the single verifier case
+	if verifiers == nil || len(verifiers) == 0 {
+		return nil
 	}
+
+	logger.LogInfo(fmt.Sprintf("ProposeBlockToVerifiers verifying block with %d verifiers", len(verifiers)))
+
+	resultChan := make(chan bool, len(verifiers))
 
 	for _, v := range verifiers {
 		reqURL := transport.URLFromAddressAndPath(v.Address, req.Path())
 
-		go sendBlockProposal(reqURL, req, prevHash, resultChan)
+		go sendBlockProposal(reqURL, req, resultChan)
 	}
 
 	numMatch := 0
@@ -63,34 +51,69 @@ func ProposeBlockWithAction(verifiers []*model.Node, action actions.Action, keyS
 	}
 
 	if numMismatch > 0 {
-		return nil, fmt.Errorf("ProposeBlockWithAction failed to add pending block: %d verifiers reported ID mismatch", numMismatch)
+		return fmt.Errorf("ProposeBlockToVerifiers failed to add pending block: %d verifiers reported ID mismatch", numMismatch)
 	}
 
-	res, err := execute.AddPendingBlock(chain, keySet, req)
-	if err != nil {
-		if res != nil {
-			logger.LogError(errors.New("ProposeBlockWithAction tried to AddPendingBlock, but an ID mismatch occurred"))
-		}
-
-		return nil, errors.Wrap(err, "ProposeBlockWithAction failed to AddPendingBlock")
-	}
-
-	return block, nil
+	return nil
 }
 
-func sendBlockProposal(url string, req *requests.ProposeBlockRequest, prevHash []byte, resultChan chan bool) {
-	resp := &requests.ProposeBlockResponse{}
-
-	if err := transport.Post(url, req, resp); err != nil {
+func sendBlockProposal(url string, req *requests.ProposeBlockRequest, resultChan chan bool) {
+	if err := transport.Post(url, req, nil); err != nil {
 		logger.LogError(errors.Wrap(err, "sendBlockProposal failed to Post"))
 		resultChan <- false
 	}
 
-	if !bytes.Equal(prevHash, resp.PrevHash) {
-		logger.LogError(errors.New("sendBLockProposal found prevHash mismatch"))
-		resultChan <- false
-		return
+	resultChan <- true
+}
+
+// CheckBlockWithVerifiers proposes a block and decides if the verifiers will accept it
+func CheckBlockWithVerifiers(block *blockchain.Block, verifiers []*model.Node, thisNode *model.Node) error {
+	req := &requests.CheckBlockRequest{
+		Block: block,
 	}
 
-	resultChan <- resp.IDMismatch
+	// handle the single verifier case
+	if len(verifiers) == 0 {
+		return nil
+	}
+
+	resultChan := make(chan bool)
+
+	for _, v := range verifiers {
+		reqURL := transport.URLFromAddressAndPath(v.Address, req.Path())
+
+		go sendBlockCheck(reqURL, req, resultChan)
+	}
+
+	numMatch := 0
+	numMismatch := 0
+
+	for true {
+		match := <-resultChan
+
+		if match {
+			numMatch++
+		} else {
+			numMismatch++
+		}
+
+		if numMatch+numMismatch == len(verifiers) {
+			break
+		}
+	}
+
+	if numMismatch > 0 {
+		return fmt.Errorf("CheckBlockWithVerifiers failed to check pending block: %d verifiers reported ID mismatch", numMismatch)
+	}
+
+	return nil
+}
+
+func sendBlockCheck(url string, req *requests.CheckBlockRequest, resultChan chan bool) {
+	if err := transport.Post(url, req, nil); err != nil {
+		logger.LogError(errors.Wrap(err, "sendBlockCheck failed to Post"))
+		resultChan <- false
+	}
+
+	resultChan <- true
 }

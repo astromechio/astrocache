@@ -18,6 +18,10 @@ func (aks *KeySet) AddKeyPair(pair *KeyPair) {
 
 // KeyPairWithKID checks if a particular keyPair exists in the keySet
 func (aks *KeySet) KeyPairWithKID(kid string) *KeyPair {
+	if aks.KeyPair.KID == kid {
+		return aks.KeyPair
+	}
+
 	pair, ok := aks.pairs[kid]
 	if !ok {
 		return nil
