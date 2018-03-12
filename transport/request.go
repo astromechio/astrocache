@@ -48,7 +48,7 @@ func Post(url string, req requests.Request, res interface{}) error {
 }
 
 // Get sends a POST request to a node with a request
-func Get(url string, req requests.Request, res interface{}) error {
+func Get(url string, res interface{}) error {
 	getRequest, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "Get failed to NewRequest")

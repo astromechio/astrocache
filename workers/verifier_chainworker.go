@@ -37,12 +37,10 @@ func StartChainWorker(config *server.Config) {
 
 		if blockJob.Block.Signature == nil {
 			if err := mineBlock(blockJob.Block, chain, config); err != nil {
-				logger.LogError(errors.Wrap(err, "StartChainWorker failed to mineBlock"))
 				blockJob.ResultChan <- errors.Wrap(err, "StartChainWorker failed to mineBlock")
 			}
 		} else {
 			if err := checkBlock(blockJob.Block, chain, config); err != nil {
-				logger.LogError(errors.Wrap(err, "StartChainWorker failed to mineBlock"))
 				blockJob.ResultChan <- errors.Wrap(err, "StartChainWorker failed to checkBlock")
 			}
 		}

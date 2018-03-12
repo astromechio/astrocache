@@ -47,7 +47,7 @@ func (c *Chain) SetProposedBlock(block *Block) error {
 		}
 	} else {
 		if prevBlock.ID != block.PrevID {
-			return errors.New("AddPendingBlock failed to add block: block.PrevID did not match prevBlock.ID")
+			return fmt.Errorf("AddPendingBlock failed to add block: block.PrevID (%s) did not match prevBlock.ID (%s)", block.PrevID, prevBlock.ID)
 		}
 	}
 
@@ -69,6 +69,22 @@ func (c *Chain) CommitProposedBlock(keySet *acrypto.KeySet) error {
 
 	c.Blocks = append(c.Blocks, c.Proposed)
 	c.Proposed = nil
+
+	return nil
+}
+
+// LoadFromBlocks loads a chain from a block array
+func (c *Chain) LoadFromBlocks(blocks []*Block) error {
+	if len(c.Blocks) > 0 {
+		return fmt.Errorf("LoadFromBlocks attempted to load chain with %d existing blocks", len(c.Blocks))
+	}
+
+	for i := range blocks {
+		errChan := c.AddNewBlock(blocks[i])
+		if err := <-errChan; err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

@@ -79,9 +79,12 @@ func AddVerifierNodeHandler(config *server.Config) http.HandlerFunc {
 
 		config.NodeList.AddVerifier(newNode)
 
+		masterPubKeyJSON := config.KeySet.KeyPair.PubKeyJSON()
+
 		resp := requests.NewNodeResponse{
-			EncGlobalKey: encGlobalKey,
-			Node:         newNode,
+			EncGlobalKey:     encGlobalKey,
+			Node:             newNode,
+			MasterPubKeyJSON: masterPubKeyJSON,
 		}
 
 		transport.ReplyWithJSON(w, resp)

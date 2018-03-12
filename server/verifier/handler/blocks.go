@@ -25,7 +25,9 @@ func ProposeAddBlockHandler(config *server.Config) http.HandlerFunc {
 			return
 		}
 
-		if err := chain.AddNewBlock(proposeReq.Block); err != nil {
+		errChan := chain.AddNewBlock(proposeReq.Block)
+		if err := <-errChan; err != nil {
+			logger.LogError(errors.Wrap(err, "ProposeAddBlockHandler failed to AddNewBlock"))
 			transport.Conflict(w)
 		}
 

@@ -27,6 +27,7 @@ func StartVerifier() {
 	}
 
 	go workers.StartChainWorker(config)
+	go loadChain(config)
 
 	router := router(config)
 
@@ -58,6 +59,10 @@ func generateConfig() (*server.Config, error) {
 	}
 
 	masterAddr := os.Args[3]
+	masterNode := &model.Node{
+		Address: fmt.Sprintf("%s:3000", masterAddr),
+	}
+
 	joinCode := os.Args[4]
 
 	keyPair, err := acrypto.GenerateNewKeyPair()
@@ -74,18 +79,20 @@ func generateConfig() (*server.Config, error) {
 	chain := blockchain.EmptyChain()
 
 	config := &server.Config{
-		Self:     node,
-		KeySet:   keySet,
-		Chain:    chain,
-		NodeList: &server.NodeList{},
+		Self:   node,
+		KeySet: keySet,
+		Chain:  chain,
+		NodeList: &server.NodeList{
+			Master: masterNode,
+		},
 	}
 
-	encGlobalKey, err := joinNetwork(masterAddr, joinCode, config)
+	newNode, err := send.JoinNetwork(config, masterAddr, joinCode)
 	if err != nil {
-		return nil, errors.Wrap(err, "generateConfig failed to joinNetwork")
+		return nil, errors.Wrap(err, "generateConfig failed to JoinNetwork")
 	}
 
-	globalKeyJSON, err := keyPair.Decrypt(encGlobalKey)
+	globalKeyJSON, err := keyPair.Decrypt(newNode.EncGlobalKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to Decrypt")
 	}
@@ -97,18 +104,25 @@ func generateConfig() (*server.Config, error) {
 
 	config.KeySet.GlobalKey = globalKey
 
+	masterKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNode.MasterPubKeyJSON)
+	if err != nil {
+		return nil, errors.Wrap(err, "generateConfig failed to KeyPairFromPubKeyJSON")
+	}
+
+	config.KeySet.AddKeyPair(masterKeyPair)
+
 	logger.LogInfo("joined network successfully")
 
 	return config, nil
 }
 
-func joinNetwork(masterAddr, joinCode string, config *server.Config) (*acrypto.Message, error) {
-	logger.LogInfo(fmt.Sprintf("joining network with master node at address %s", masterAddr))
-
-	newNode, err := send.JoinNetwork(config, masterAddr, joinCode)
+func loadChain(config *server.Config) {
+	blocks, err := send.GetEntireChain(config.NodeList.Master)
 	if err != nil {
-		return nil, errors.Wrap(err, "joinNetwork failed to JoinNetwork")
+		log.Fatal(errors.Wrap(err, "loadChain failed to GetEntireChain, dying now..."))
 	}
 
-	return newNode.EncGlobalKey, nil
+	if err := config.Chain.LoadFromBlocks(blocks); err != nil {
+		log.Fatal(errors.Wrap(err, "loadChain failed to LoadFromBlocks, dying now..."))
+	}
 }

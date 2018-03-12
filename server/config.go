@@ -38,6 +38,7 @@ func (c *Config) ValueForKey(key string) string {
 
 // NodeList defines the nodes a master looks after
 type NodeList struct {
+	Master    *model.Node
 	Verifiers []*model.Node
 	Workers   []*model.Node
 }

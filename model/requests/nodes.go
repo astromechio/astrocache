@@ -71,5 +71,6 @@ func (nr *NewNodeRequest) Verify() error {
 // NewNodeResponse contains everything a node needs to bootstrap istelf
 type NewNodeResponse struct {
 	*model.Node
-	EncGlobalKey *acrypto.Message `json:"encGlobalKey"`
+	EncGlobalKey     *acrypto.Message `json:"encGlobalKey"`
+	MasterPubKeyJSON []byte           `json:"masterPubKeyJSON"`
 }
