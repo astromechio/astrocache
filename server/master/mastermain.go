@@ -7,38 +7,45 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/astromechio/astrocache/model/actions"
+
+	"github.com/astromechio/astrocache/config"
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
-	"github.com/astromechio/astrocache/server"
 	"github.com/astromechio/astrocache/workers"
 	"github.com/pkg/errors"
 )
 
 // StartMaster starts a master node
 func StartMaster() {
-	logger.LogInfo("bootstrapping astrocache master node")
-
-	config, err := generateConfig()
+	app, err := generateConfig()
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "StartMaster failed to generateConfig"))
 	}
 
-	go workers.StartChainWorker(config)
+	logger.LogInfo("bootstrapping astrocache master node (" + app.Self.NID + ")\n")
 
-	router := router(config)
+	joinCode := app.ValueForKey(config.AppJoinCodeKey)
+	logger.LogInfo(fmt.Sprintf("to join the network, run `astrocache [worker|verifier] [node address] %s %s`\n", app.Self.Address, joinCode))
 
-	joinCode := config.ValueForKey(server.ConfigJoinCodeKey)
-	logger.LogInfo(fmt.Sprintf("to join the network, run `astrocache [worker|verifier] [node address] %s %s`\n", config.Self.Address, joinCode))
+	startWorkers(app)
 
-	logger.LogInfo("starting astrocache master node server on port 3000")
+	router := router(app)
+
+	logger.LogInfo("starting astrocache master node server on port 3000\n")
 	if err := http.ListenAndServe(":3000", router); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func generateConfig() (*server.Config, error) {
+func startWorkers(app *config.App) {
+	go workers.StartActionWorker(app)
+	go workers.StartChainWorker(app)
+}
+
+func generateConfig() (*config.App, error) {
 	if len(os.Args) < 3 {
 		return nil, errors.New("missing argument: address")
 	}
@@ -62,22 +69,32 @@ func generateConfig() (*server.Config, error) {
 		GlobalKey: globalKey,
 	}
 
-	chain, err := blockchain.BrandNewChain(keyPair, globalKey, node)
+	globalKeyJSON := globalKey.JSON()
+
+	encGlobalKey, err := keyPair.Encrypt(globalKeyJSON)
+	if err != nil {
+		return nil, errors.Wrap(err, "generateConfig failed to Encrypt")
+	}
+
+	nodeAddedAction := actions.NewNodeAdded(node, encGlobalKey)
+	actionJSON := nodeAddedAction.JSON()
+
+	chain, err := blockchain.BrandNewChain(keyPair, globalKey, actionJSON, nodeAddedAction.ActionType())
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to BrandNewChain")
 	}
 
-	config := &server.Config{
+	app := &config.App{
 		Self:     node,
 		KeySet:   keySet,
 		Chain:    chain,
-		NodeList: &server.NodeList{},
+		NodeList: &config.NodeList{},
 	}
 
 	joinCode := generateJoinCode()
-	config.SetValueForKey(joinCode, server.ConfigJoinCodeKey)
+	app.SetValueForKey(joinCode, config.AppJoinCodeKey)
 
-	return config, nil
+	return app, nil
 }
 
 func generateJoinCode() string {

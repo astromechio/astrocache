@@ -6,8 +6,6 @@ import (
 	"github.com/astromechio/astrocache/logger"
 
 	acrypto "github.com/astromechio/astrocache/crypto"
-	"github.com/astromechio/astrocache/model"
-	"github.com/astromechio/astrocache/model/actions"
 	"github.com/pkg/errors"
 )
 
@@ -16,21 +14,37 @@ type Chain struct {
 	Blocks     []*Block
 	Proposed   *Block
 	WorkerChan chan (*NewBlockJob) // WorkerChan is used by verifier_chainworker as the synchronization method for mining and verifying new blocks
+	ActionChan chan (*Block)       // ActionChan decrypts blocks and applies actions
 }
 
 // NewBlockJob represents the intent to add a new block
 type NewBlockJob struct {
 	Block      *Block
 	ResultChan chan (error)
+	Check      bool
 }
 
-// AddNewBlock adds a block to the pending list and returns the potential prevBlock
+// AddNewBlock queues a new block job
 func (c *Chain) AddNewBlock(block *Block) chan (error) {
 	errChan := make(chan error, 1)
 
 	job := &NewBlockJob{
 		Block:      block,
 		ResultChan: errChan,
+		Check:      true,
+	}
+
+	c.WorkerChan <- job
+	return errChan
+}
+
+func (c *Chain) addNewBlockUnchecked(block *Block) chan (error) {
+	errChan := make(chan error, 1)
+
+	job := &NewBlockJob{
+		Block:      block,
+		ResultChan: errChan,
+		Check:      false,
 	}
 
 	c.WorkerChan <- job
@@ -68,6 +82,9 @@ func (c *Chain) CommitProposedBlock(keySet *acrypto.KeySet) error {
 	logger.LogInfo(fmt.Sprintf("*** Committing bock with ID %s ***", c.Proposed.ID))
 
 	c.Blocks = append(c.Blocks, c.Proposed)
+
+	c.ActionChan <- c.Proposed // send the block to be executed
+
 	c.Proposed = nil
 
 	return nil
@@ -80,7 +97,7 @@ func (c *Chain) LoadFromBlocks(blocks []*Block) error {
 	}
 
 	for i := range blocks {
-		errChan := c.AddNewBlock(blocks[i])
+		errChan := c.addNewBlockUnchecked(blocks[i])
 		if err := <-errChan; err != nil {
 			return err
 		}
@@ -94,13 +111,14 @@ func EmptyChain() *Chain {
 	chain := &Chain{
 		Blocks:     []*Block{},
 		WorkerChan: make(chan *NewBlockJob, 2),
+		ActionChan: make(chan *Block),
 	}
 
 	return chain
 }
 
 // BrandNewChain creates a fresh chain using the master keyPair
-func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, node *model.Node) (*Chain, error) {
+func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, blockData []byte, actionType string) (*Chain, error) {
 	if masterKeyPair.KID != acrypto.MasterKeyPairKID {
 		return nil, fmt.Errorf("attempted to create new chain with non-master keyPair")
 	}
@@ -109,25 +127,7 @@ func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, no
 		return nil, fmt.Errorf("attempted to create new chain with non-global symKey")
 	}
 
-	nodeKeyPair, err := node.KeyPair()
-	if err != nil {
-		return nil, errors.Wrap(err, "BrandNewChain failed to node.KeyPair")
-	}
-
-	if nodeKeyPair.KID != masterKeyPair.KID || node.Type != model.NodeTypeMaster {
-		return nil, fmt.Errorf("BrandNewChain attempted to create a new chain with a non-master node or keypair")
-	}
-
-	globalKeyJSON := globalKey.JSON()
-
-	encGlobalKey, err := masterKeyPair.Encrypt(globalKeyJSON)
-	if err != nil {
-		return nil, errors.Wrap(err, "BrandNewChain failed to masterKeyPair.Encrypt")
-	}
-
-	nodeAddedAction := actions.NewNodeAdded(node, encGlobalKey)
-
-	genesis, err := genesisBlockWithAction(globalKey, nodeAddedAction)
+	genesis, err := genesisBlockWithData(globalKey, blockData, actionType)
 	if err != nil {
 		return nil, errors.Wrap(err, "BrandNewChain failed to NewBlockWithAction")
 	}

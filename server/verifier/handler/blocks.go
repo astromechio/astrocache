@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/astromechio/astrocache/config"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model/requests"
-	"github.com/astromechio/astrocache/server"
 	"github.com/astromechio/astrocache/transport"
 	"github.com/pkg/errors"
 )
 
 // ProposeAddBlockHandler adds a proposed new block
-func ProposeAddBlockHandler(config *server.Config) http.HandlerFunc {
+func ProposeAddBlockHandler(app *config.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		chain := config.Chain
+		chain := app.Chain
 
 		proposeReq := &requests.ProposeBlockRequest{}
 		proposeReq.FromRequest(r)
@@ -36,9 +36,9 @@ func ProposeAddBlockHandler(config *server.Config) http.HandlerFunc {
 }
 
 // CheckBlockHandler adds a proposed new block and responds with the proposed prevBlock
-func CheckBlockHandler(config *server.Config) http.HandlerFunc {
+func CheckBlockHandler(app *config.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		chain := config.Chain
+		chain := app.Chain
 
 		checkReq := &requests.CheckBlockRequest{}
 		checkReq.FromRequest(r)
@@ -52,8 +52,15 @@ func CheckBlockHandler(config *server.Config) http.HandlerFunc {
 		lastBlock := chain.LastBlock()
 		if !lastBlock.IsSameAsBlock(checkReq.Block) {
 			proposed := chain.Proposed
-			if !proposed.IsSameAsBlock(checkReq.Block) {
-				logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as LastBlock or Proposed", checkReq.Block.ID))
+
+			if chain.Proposed != nil {
+				if !proposed.IsSameAsBlock(checkReq.Block) {
+					logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as LastBlock or Proposed", checkReq.Block.ID))
+					transport.Conflict(w)
+					return
+				}
+			} else {
+				logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as LastBlock and Proposed is nil", checkReq.Block.ID))
 				transport.Conflict(w)
 				return
 			}

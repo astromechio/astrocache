@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	acrypto "github.com/astromechio/astrocache/crypto"
-	"github.com/astromechio/astrocache/model/actions"
 	"github.com/pkg/errors"
 )
 
@@ -31,29 +30,25 @@ type Block struct {
 	PrevID     string             `json:"prevId"`
 }
 
-// NewBlockWithAction creates a block with JSON from an action
-func NewBlockWithAction(encKey *acrypto.SymKey, action actions.Action) (*Block, error) {
-	actionJSON := action.JSON()
-
-	block, err := newBlock(encKey, actionJSON)
+// NewBlockWithData creates a block with JSON from an action
+func NewBlockWithData(encKey *acrypto.SymKey, data []byte, actionType string) (*Block, error) {
+	block, err := newBlock(encKey, data)
 	if err != nil {
 		return nil, errors.Wrap(err, "NewBlockWithAction failed to NewBlock")
 	}
 
-	block.ActionType = action.ActionType()
+	block.ActionType = actionType
 
 	return block, nil
 }
 
-func genesisBlockWithAction(encKey *acrypto.SymKey, action actions.Action) (*Block, error) {
-	actionJSON := action.JSON()
-
-	block, err := newBlock(encKey, actionJSON)
+func genesisBlockWithData(encKey *acrypto.SymKey, data []byte, actionType string) (*Block, error) {
+	block, err := newBlock(encKey, data)
 	if err != nil {
 		return nil, errors.Wrap(err, "genesisBlockWithAction failed to NewBlock")
 	}
 
-	block.ActionType = action.ActionType()
+	block.ActionType = actionType
 
 	block.ID = genesisBlockID
 

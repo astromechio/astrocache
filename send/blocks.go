@@ -77,6 +77,8 @@ func CheckBlockWithVerifiers(block *blockchain.Block, verifiers []*model.Node, t
 		return nil
 	}
 
+	logger.LogInfo(fmt.Sprintf("CheckBlockWithVerifiers checking block with %d verifiers", len(verifiers)))
+
 	resultChan := make(chan bool)
 
 	for _, v := range verifiers {

@@ -6,15 +6,16 @@ import (
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/actions"
 	"github.com/astromechio/astrocache/model/blockchain"
-	"github.com/astromechio/astrocache/model/requests"
 	"github.com/pkg/errors"
 )
 
 // AddNodeToChain handles adding a new node to the network
-func AddNodeToChain(chain *blockchain.Chain, keySet *acrypto.KeySet, verifier *model.Node, action *actions.NodeAdded) (*requests.NewNodeResponse, error) {
-	block, err := blockchain.NewBlockWithAction(keySet.GlobalKey, action)
+func AddNodeToChain(chain *blockchain.Chain, keySet *acrypto.KeySet, verifier *model.Node, action *actions.NodeAdded) error {
+	actionJSON := action.JSON()
+
+	block, err := blockchain.NewBlockWithData(keySet.GlobalKey, actionJSON, action.ActionType())
 	if err != nil {
-		return nil, errors.Wrap(err, "AddNodeToChain failed to NewBlockWithAction")
+		return errors.Wrap(err, "AddNodeToChain failed to NewBlockWithAction")
 	}
 
 	prevBlock := chain.LastBlock()
@@ -24,16 +25,11 @@ func AddNodeToChain(chain *blockchain.Chain, keySet *acrypto.KeySet, verifier *m
 	if verifier == nil {
 		errChan := chain.AddNewBlock(block)
 		if err := <-errChan; err != nil {
-			return nil, errors.Wrap(err, "AddNodeToChain failed to AddNewBlock")
+			return errors.Wrap(err, "AddNodeToChain failed to AddNewBlock")
 		}
 	} else {
 		logger.LogWarn("Verifier node block mining not yet implemented")
 	}
 
-	resp := &requests.NewNodeResponse{
-		Node:         action.Node,
-		EncGlobalKey: action.EncGlobalKey,
-	}
-
-	return resp, nil
+	return nil
 }

@@ -7,40 +7,46 @@ import (
 	"os"
 	"strings"
 
+	"github.com/astromechio/astrocache/config"
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
 	"github.com/astromechio/astrocache/send"
-	"github.com/astromechio/astrocache/server"
 	"github.com/astromechio/astrocache/workers"
 	"github.com/pkg/errors"
 )
 
 // StartVerifier starts a master node
 func StartVerifier() {
-	logger.LogInfo("bootstrapping astrocache verifier node\n")
-
-	config, err := generateConfig()
+	app, err := generateConfig()
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "StartVerifier failed to generateConfig"))
 	}
 
-	go workers.StartChainWorker(config)
-	go loadChain(config)
+	logger.LogInfo("bootstrapping astrocache verifier node(" + app.Self.NID + ")\n")
 
-	router := router(config)
+	startWorkers(app)
 
-	addrParts := strings.Split(config.Self.Address, ":")
+	go loadChain(app)
+
+	router := router(app)
+
+	addrParts := strings.Split(app.Self.Address, ":")
 	port := addrParts[len(addrParts)-1]
 
-	logger.LogInfo(fmt.Sprintf("starting astrocache verifier node server on port %s", port))
+	logger.LogInfo(fmt.Sprintf("starting astrocache verifier node server on port %s\n", port))
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), router); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func generateConfig() (*server.Config, error) {
+func startWorkers(app *config.App) {
+	go workers.StartActionWorker(app)
+	go workers.StartChainWorker(app)
+}
+
+func generateConfig() (*config.App, error) {
 	if len(os.Args) < 3 {
 		return nil, errors.New("missing argument: address")
 	}
@@ -78,16 +84,16 @@ func generateConfig() (*server.Config, error) {
 
 	chain := blockchain.EmptyChain()
 
-	config := &server.Config{
+	app := &config.App{
 		Self:   node,
 		KeySet: keySet,
 		Chain:  chain,
-		NodeList: &server.NodeList{
+		NodeList: &config.NodeList{
 			Master: masterNode,
 		},
 	}
 
-	newNode, err := send.JoinNetwork(config, masterAddr, joinCode)
+	newNode, err := send.JoinNetwork(app, masterAddr, joinCode)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to JoinNetwork")
 	}
@@ -102,27 +108,27 @@ func generateConfig() (*server.Config, error) {
 		return nil, errors.Wrap(err, "generateConfig failed to SymKeyFromJSON")
 	}
 
-	config.KeySet.GlobalKey = globalKey
+	app.KeySet.GlobalKey = globalKey
 
 	masterKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNode.MasterPubKeyJSON)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to KeyPairFromPubKeyJSON")
 	}
 
-	config.KeySet.AddKeyPair(masterKeyPair)
+	app.KeySet.AddKeyPair(masterKeyPair)
 
 	logger.LogInfo("joined network successfully")
 
-	return config, nil
+	return app, nil
 }
 
-func loadChain(config *server.Config) {
-	blocks, err := send.GetEntireChain(config.NodeList.Master)
+func loadChain(app *config.App) {
+	blocks, err := send.GetEntireChain(app.NodeList.Master)
 	if err != nil {
 		log.Fatal(errors.Wrap(err, "loadChain failed to GetEntireChain, dying now..."))
 	}
 
-	if err := config.Chain.LoadFromBlocks(blocks); err != nil {
+	if err := app.Chain.LoadFromBlocks(blocks); err != nil {
 		log.Fatal(errors.Wrap(err, "loadChain failed to LoadFromBlocks, dying now..."))
 	}
 }

@@ -4,21 +4,20 @@ import (
 	"crypto/rand"
 	"net/http"
 
+	"github.com/astromechio/astrocache/config"
 	"github.com/astromechio/astrocache/model/blockchain"
 
 	"github.com/astromechio/astrocache/logger"
 	"github.com/pkg/errors"
 
 	acrypto "github.com/astromechio/astrocache/crypto"
-	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/actions"
 	"github.com/astromechio/astrocache/model/requests"
-	"github.com/astromechio/astrocache/server"
 	"github.com/astromechio/astrocache/transport"
 )
 
 // AddVerifierNodeHandler handles POST /v1/master/nodes/verifier
-func AddVerifierNodeHandler(config *server.Config) http.HandlerFunc {
+func AddVerifierNodeHandler(app *config.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		newNodeRequest := &requests.NewNodeRequest{}
 		if err := newNodeRequest.FromRequest(r); err != nil {
@@ -33,57 +32,48 @@ func AddVerifierNodeHandler(config *server.Config) http.HandlerFunc {
 			return
 		}
 
-		joinCode := config.ValueForKey(server.ConfigJoinCodeKey)
+		joinCode := app.ValueForKey(config.AppJoinCodeKey)
 		if newNodeRequest.JoinCode != joinCode {
 			logger.LogError(errors.New("AddVerifierNodeHandler failed to verify JoinCode"))
 			transport.Forbidden(w)
 			return
 		}
 
-		newNode := &model.Node{
-			NID:     generateNewNodeID(),
-			Address: newNodeRequest.Address,
-			Type:    model.NodeTypeVerifier,
-			PubKey:  newNodeRequest.PubKey,
-		}
-
-		newNodePubKey, err := acrypto.KeyPairFromPubKeyJSON(newNodeRequest.PubKey)
+		newNodePubKey, err := acrypto.KeyPairFromPubKeyJSON(newNodeRequest.Node.PubKey)
 		if err != nil {
 			logger.LogError(errors.Wrap(err, "AddVerifierNodeHandler failed to KeyPairFromPubKeyJSON"))
 			transport.BadRequest(w)
 			return
 		}
 
-		encGlobalKey, err := newNodePubKey.Encrypt(config.KeySet.GlobalKey.JSON())
+		encGlobalKey, err := newNodePubKey.Encrypt(app.KeySet.GlobalKey.JSON())
 		if err != nil {
 			logger.LogError(errors.Wrap(err, "AddVerifierNodeHandler failed to Encrypt"))
 			transport.InternalServerError(w)
 			return
 		}
 
-		nodeAddedAction := actions.NewNodeAdded(newNode, encGlobalKey)
+		nodeAddedAction := actions.NewNodeAdded(newNodeRequest.Node, encGlobalKey)
+		actionJSON := nodeAddedAction.JSON()
 
-		block, err := blockchain.NewBlockWithAction(config.KeySet.GlobalKey, nodeAddedAction)
+		block, err := blockchain.NewBlockWithData(app.KeySet.GlobalKey, actionJSON, nodeAddedAction.ActionType())
 		if err != nil {
 			logger.LogError(errors.Wrap(err, "AddVerifierNodeHandler failed to NewBlockWithAction"))
 			transport.InternalServerError(w)
 			return
 		}
 
-		errChan := config.Chain.AddNewBlock(block)
+		errChan := app.Chain.AddNewBlock(block)
 		if err := <-errChan; err != nil {
 			logger.LogError(errors.Wrap(err, "AddVerifierNodeHandler failed to AddNewBlock"))
 			transport.InternalServerError(w)
 			return
 		}
 
-		config.NodeList.AddVerifier(newNode)
-
-		masterPubKeyJSON := config.KeySet.KeyPair.PubKeyJSON()
+		masterPubKeyJSON := app.KeySet.KeyPair.PubKeyJSON()
 
 		resp := requests.NewNodeResponse{
 			EncGlobalKey:     encGlobalKey,
-			Node:             newNode,
 			MasterPubKeyJSON: masterPubKeyJSON,
 		}
 
