@@ -18,12 +18,20 @@ type Action interface {
 // ActionTypeNodeAdded and others represent different types of actions
 const (
 	ActionTypeNodeAdded = "astro.action.nodeadded"
+	ActionTypeSetValue  = "astro.action.setvalue"
 )
 
 // UnmarshalAction unmarshals an action from JSON
 func UnmarshalAction(actionJSON []byte, actionType string) (Action, error) {
 	if actionType == ActionTypeNodeAdded {
 		action := &NodeAdded{}
+		if err := json.Unmarshal(actionJSON, action); err != nil {
+			return nil, errors.Wrap(err, "UnmarshalAction failed to Unmarshal")
+		}
+
+		return action, nil
+	} else if actionType == ActionTypeSetValue {
+		action := &SetValue{}
 		if err := json.Unmarshal(actionJSON, action); err != nil {
 			return nil, errors.Wrap(err, "UnmarshalAction failed to Unmarshal")
 		}

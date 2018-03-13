@@ -16,5 +16,7 @@ func router(app *config.App) *mux.Router {
 	// TODO: different method for check?
 	mux.Methods(http.MethodPost).Path("/v1/verifier/block/check").HandlerFunc(handler.CheckBlockHandler(app))
 
+	mux.Methods(http.MethodPost).Path("/v1/value/{key}").HandlerFunc(handler.SetValueHandler(app))
+
 	return mux
 }

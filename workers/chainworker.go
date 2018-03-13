@@ -38,10 +38,12 @@ func StartChainWorker(app *config.App) {
 		if blockJob.Block.Signature == nil {
 			if err := mineBlock(blockJob.Block, chain, app); err != nil {
 				blockJob.ResultChan <- errors.Wrap(err, "StartChainWorker failed to mineBlock")
+				chain.Proposed = nil
 			}
 		} else {
 			if err := checkBlock(blockJob.Block, chain, app, blockJob.Check); err != nil {
 				blockJob.ResultChan <- errors.Wrap(err, "StartChainWorker failed to checkBlock")
+				chain.Proposed = nil
 			}
 		}
 

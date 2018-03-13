@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"crypto/rand"
 	"net/http"
 
 	"github.com/astromechio/astrocache/config"
@@ -70,20 +69,81 @@ func AddVerifierNodeHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		masterPubKeyJSON := app.KeySet.KeyPair.PubKeyJSON()
-
 		resp := requests.NewNodeResponse{
-			EncGlobalKey:     encGlobalKey,
-			MasterPubKeyJSON: masterPubKeyJSON,
+			EncGlobalKey: encGlobalKey,
+			Master:       app.Self,
 		}
+
+		// if this is the first verifier, it will be responsible for distributing blocks to us
+		resp.IsPrimary = len(app.NodeList.Verifiers) == 0
 
 		transport.ReplyWithJSON(w, resp)
 	}
 }
 
-func generateNewNodeID() string {
-	bytes := make([]byte, 32)
-	rand.Read(bytes)
+// AddWorkerNodeHandler handles POST /v1/master/nodes/verifier
+func AddWorkerNodeHandler(app *config.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		newNodeRequest := &requests.NewNodeRequest{}
+		if err := newNodeRequest.FromRequest(r); err != nil {
+			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to FromRequest"))
+			transport.BadRequest(w)
+			return
+		}
 
-	return acrypto.Base64URLEncode(bytes)
+		if err := requests.VerifyRequest(newNodeRequest); err != nil {
+			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to VerifyRequest"))
+			transport.BadRequest(w)
+			return
+		}
+
+		joinCode := app.ValueForKey(config.AppJoinCodeKey)
+		if newNodeRequest.JoinCode != joinCode {
+			logger.LogError(errors.New("AddWorkerNodeHandler failed to verify JoinCode"))
+			transport.Forbidden(w)
+			return
+		}
+
+		newNodePubKey, err := acrypto.KeyPairFromPubKeyJSON(newNodeRequest.Node.PubKey)
+		if err != nil {
+			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to KeyPairFromPubKeyJSON"))
+			transport.BadRequest(w)
+			return
+		}
+
+		encGlobalKey, err := newNodePubKey.Encrypt(app.KeySet.GlobalKey.JSON())
+		if err != nil {
+			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to Encrypt"))
+			transport.InternalServerError(w)
+			return
+		}
+
+		verifier := app.NodeList.RandomVerifier()
+		newNodeRequest.Node.ParentNID = verifier.NID
+
+		nodeAddedAction := actions.NewNodeAdded(newNodeRequest.Node, encGlobalKey)
+		actionJSON := nodeAddedAction.JSON()
+
+		block, err := blockchain.NewBlockWithData(app.KeySet.GlobalKey, actionJSON, nodeAddedAction.ActionType())
+		if err != nil {
+			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to NewBlockWithAction"))
+			transport.InternalServerError(w)
+			return
+		}
+
+		errChan := app.Chain.AddNewBlock(block)
+		if err := <-errChan; err != nil {
+			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to AddNewBlock"))
+			transport.InternalServerError(w)
+			return
+		}
+
+		resp := requests.NewNodeResponse{
+			EncGlobalKey: encGlobalKey,
+			Master:       app.Self,
+			Verifier:     verifier,
+		}
+
+		transport.ReplyWithJSON(w, resp)
+	}
 }

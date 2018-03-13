@@ -3,6 +3,7 @@ package config
 import (
 	"math/rand"
 
+	"github.com/astromechio/astrocache/cache"
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
@@ -18,6 +19,7 @@ type App struct {
 	Self     *model.Node
 	KeySet   *acrypto.KeySet
 	Chain    *blockchain.Chain
+	Cache    *cache.Cache
 	NodeList *NodeList
 	Values   map[string]string
 }
@@ -46,6 +48,11 @@ type NodeList struct {
 // WorkersForVerifierWithNID returns the worker nodes assigned to a verifier node with NID
 func (nl *NodeList) WorkersForVerifierWithNID(nid string) []*model.Node {
 	workers := []*model.Node{}
+
+	// if we are the primary verifier, we need to distribute blocks to the master
+	if nl.Master.ParentNID != "" {
+		workers = append(workers, nl.Master)
+	}
 
 	for i, w := range nl.Workers {
 		if w.ParentNID == nid {

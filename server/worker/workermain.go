@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/astromechio/astrocache/cache"
 	"github.com/astromechio/astrocache/config"
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/logger"
@@ -25,6 +26,7 @@ func StartWorker() {
 	}
 
 	logger.LogInfo("bootstrapping astrocache worker node(" + app.Self.NID + ")\n")
+	logger.LogInfo("using verifier node with NID " + app.NodeList.RandomVerifier().NID)
 
 	startWorkers(app)
 
@@ -65,9 +67,6 @@ func generateConfig() (*config.App, error) {
 	}
 
 	masterAddr := os.Args[3]
-	masterNode := &model.Node{
-		Address: fmt.Sprintf("%s:3000", masterAddr),
-	}
 
 	joinCode := os.Args[4]
 
@@ -85,12 +84,11 @@ func generateConfig() (*config.App, error) {
 	chain := blockchain.EmptyChain()
 
 	app := &config.App{
-		Self:   node,
-		KeySet: keySet,
-		Chain:  chain,
-		NodeList: &config.NodeList{
-			Master: masterNode,
-		},
+		Self:     node,
+		KeySet:   keySet,
+		Chain:    chain,
+		Cache:    cache.EmptyCache(),
+		NodeList: &config.NodeList{},
 	}
 
 	newNode, err := send.JoinNetwork(app, masterAddr, joinCode)
@@ -110,12 +108,23 @@ func generateConfig() (*config.App, error) {
 
 	app.KeySet.GlobalKey = globalKey
 
-	masterKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNode.MasterPubKeyJSON)
+	masterKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNode.Master.PubKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "generateConfig failed to KeyPairFromPubKeyJSON")
+	}
+
+	verifierKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNode.Verifier.PubKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to KeyPairFromPubKeyJSON")
 	}
 
 	app.KeySet.AddKeyPair(masterKeyPair)
+	app.NodeList.Master = newNode.Master
+
+	app.KeySet.AddKeyPair(verifierKeyPair)
+	app.NodeList.AddVerifier(newNode.Verifier)
+
+	app.Self.ParentNID = newNode.Verifier.NID
 
 	logger.LogInfo("joined network successfully")
 

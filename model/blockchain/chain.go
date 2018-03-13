@@ -11,10 +11,13 @@ import (
 
 // Chain represents a blockchain
 type Chain struct {
-	Blocks     []*Block
-	Proposed   *Block
-	WorkerChan chan (*NewBlockJob) // WorkerChan is used by verifier_chainworker as the synchronization method for mining and verifying new blocks
-	ActionChan chan (*Block)       // ActionChan decrypts blocks and applies actions
+	Blocks         []*Block
+	Proposed       *Block
+	WorkerChan     chan (*NewBlockJob) // WorkerChan is used by verifier_chainworker as the synchronization method for mining and verifying new blocks
+	ActionChan     chan (*Block)       // ActionChan decrypts blocks and applies actions
+	DistributeChan chan (*Block)       // DistributeChan loads blocks needed to be distributed to workers
+	ProposedChan   chan (*Block)       // ProposedChan is used when a goroutine needs to know the next time a block is proposed. It may or may not be nil
+	CommittedChan  chan (*Block)       // CommittedChan is used when a goroutine needs to know the next time a block is committed. It may or may not be nil
 }
 
 // NewBlockJob represents the intent to add a new block
@@ -38,7 +41,8 @@ func (c *Chain) AddNewBlock(block *Block) chan (error) {
 	return errChan
 }
 
-func (c *Chain) addNewBlockUnchecked(block *Block) chan (error) {
+// AddNewBlockUnchecked adds a new block without verifier check
+func (c *Chain) AddNewBlockUnchecked(block *Block) chan (error) {
 	errChan := make(chan error, 1)
 
 	job := &NewBlockJob{
@@ -67,6 +71,11 @@ func (c *Chain) SetProposedBlock(block *Block) error {
 
 	c.Proposed = block
 
+	if c.ProposedChan != nil {
+		c.ProposedChan <- block
+		c.ProposedChan = nil
+	}
+
 	return nil
 }
 
@@ -85,6 +94,11 @@ func (c *Chain) CommitProposedBlock(keySet *acrypto.KeySet) error {
 
 	c.ActionChan <- c.Proposed // send the block to be executed
 
+	if c.CommittedChan != nil {
+		c.CommittedChan <- c.Proposed
+		c.CommittedChan = nil
+	}
+
 	c.Proposed = nil
 
 	return nil
@@ -97,7 +111,7 @@ func (c *Chain) LoadFromBlocks(blocks []*Block) error {
 	}
 
 	for i := range blocks {
-		errChan := c.addNewBlockUnchecked(blocks[i])
+		errChan := c.AddNewBlockUnchecked(blocks[i])
 		if err := <-errChan; err != nil {
 			return err
 		}
@@ -106,12 +120,41 @@ func (c *Chain) LoadFromBlocks(blocks []*Block) error {
 	return nil
 }
 
+// GetNextProposed blocks until the next block is proposed
+func (c *Chain) GetNextProposed() chan *Block {
+	logger.LogInfo("Waiting for next proposed block")
+
+	if c.ProposedChan != nil {
+		return nil
+	}
+
+	notifChan := make(chan *Block, 1)
+	c.ProposedChan = notifChan
+
+	return notifChan
+}
+
+// GetNextCommitted blocks until the next block is proposed
+func (c *Chain) GetNextCommitted() chan *Block {
+	logger.LogInfo("Waiting for next committed block")
+
+	if c.CommittedChan != nil {
+		return nil
+	}
+
+	notifChan := make(chan *Block, 1)
+	c.CommittedChan = notifChan
+
+	return notifChan
+}
+
 // EmptyChain creates an enpty chain
 func EmptyChain() *Chain {
 	chain := &Chain{
-		Blocks:     []*Block{},
-		WorkerChan: make(chan *NewBlockJob, 2),
-		ActionChan: make(chan *Block),
+		Blocks:         []*Block{},
+		WorkerChan:     make(chan *NewBlockJob, 2),
+		ActionChan:     make(chan *Block),
+		DistributeChan: make(chan *Block),
 	}
 
 	return chain

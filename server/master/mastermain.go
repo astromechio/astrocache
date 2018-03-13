@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	"github.com/astromechio/astrocache/cache"
 	"github.com/astromechio/astrocache/model/actions"
 
 	"github.com/astromechio/astrocache/config"
@@ -34,8 +36,11 @@ func StartMaster() {
 
 	router := router(app)
 
-	logger.LogInfo("starting astrocache master node server on port 3000\n")
-	if err := http.ListenAndServe(":3000", router); err != nil {
+	addrParts := strings.Split(app.Self.Address, ":")
+	port := addrParts[len(addrParts)-1]
+
+	logger.LogInfo(fmt.Sprintf("starting astrocache master node server on port %s\n", port))
+	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), router); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -51,6 +56,9 @@ func generateConfig() (*config.App, error) {
 	}
 
 	address := os.Args[2]
+	if strings.Index(address, ":") < 0 {
+		return nil, errors.New("address does not contain port value")
+	}
 
 	keyPair, err := acrypto.GenerateMasterKeyPair()
 	if err != nil {
@@ -62,7 +70,13 @@ func generateConfig() (*config.App, error) {
 		return nil, errors.Wrap(err, "generateConfig failed to GenerateGlobalSymKey")
 	}
 
-	node := model.NewNode(address, model.NodeTypeMaster, keyPair)
+	keyPairPubJSON := keyPair.PubKeyJSON()
+	keyPairPub, err := acrypto.KeyPairFromPubKeyJSON(keyPairPubJSON)
+	if err != nil {
+		return nil, errors.Wrap(err, "generateConfig failed to KeyPairFromPubKeyJSON")
+	}
+
+	node := model.NewNode(address, model.NodeTypeMaster, keyPairPub)
 
 	keySet := &acrypto.KeySet{
 		KeyPair:   keyPair,
@@ -88,6 +102,7 @@ func generateConfig() (*config.App, error) {
 		Self:     node,
 		KeySet:   keySet,
 		Chain:    chain,
+		Cache:    cache.EmptyCache(),
 		NodeList: &config.NodeList{},
 	}
 
@@ -98,7 +113,7 @@ func generateConfig() (*config.App, error) {
 }
 
 func generateJoinCode() string {
-	bytes := make([]byte, 32)
+	bytes := make([]byte, 12)
 	rand.Read(bytes)
 
 	return acrypto.Base64URLEncode(bytes)

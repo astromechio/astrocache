@@ -1,8 +1,6 @@
 package send
 
 import (
-	"fmt"
-
 	"github.com/astromechio/astrocache/config"
 	"github.com/astromechio/astrocache/model/requests"
 	"github.com/astromechio/astrocache/transport"
@@ -15,9 +13,7 @@ func JoinNetwork(app *config.App, masterAddr, joinCode string) (*requests.NewNod
 		JoinCode: joinCode,
 	}
 
-	masterAddrWithPort := fmt.Sprintf("%s:3000", masterAddr)
-
-	url := transport.URLFromAddressAndPath(masterAddrWithPort, request.Path())
+	url := transport.URLFromAddressAndPath(masterAddr, request.Path())
 
 	resp := &requests.NewNodeResponse{}
 	if err := transport.Post(url, request, resp); err != nil {

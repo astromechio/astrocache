@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/astromechio/astrocache/model/blockchain"
+
 	"github.com/astromechio/astrocache/config"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model/requests"
@@ -49,23 +51,54 @@ func CheckBlockHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		lastBlock := chain.LastBlock()
-		if !lastBlock.IsSameAsBlock(checkReq.Block) {
-			proposed := chain.Proposed
+		if checkLastAndProposed(chain, checkReq.Block) {
+			transport.Ok(w)
+			return
+		}
 
-			if chain.Proposed != nil {
-				if !proposed.IsSameAsBlock(checkReq.Block) {
-					logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as LastBlock or Proposed", checkReq.Block.ID))
-					transport.Conflict(w)
+		var block *blockchain.Block
+
+		proposedChan := chain.GetNextProposed() // blocks until proposed is set
+		committedChan := chain.GetNextCommitted()
+
+		for true {
+			select {
+			case block = <-proposedChan:
+				break
+			case block = <-committedChan:
+				break
+			default:
+				if checkLastAndProposed(chain, checkReq.Block) {
+					logger.LogInfo("Checked against chain; succeeded")
+					transport.Ok(w)
 					return
 				}
-			} else {
-				logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as LastBlock and Proposed is nil", checkReq.Block.ID))
-				transport.Conflict(w)
-				return
 			}
+
+		}
+
+		logger.LogInfo("Checking against new block with ID " + block.ID)
+
+		if !block.IsSameAsBlock(checkReq.Block) {
+			logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as new block", checkReq.Block.ID))
+			transport.Conflict(w)
+			return
 		}
 
 		transport.Ok(w)
 	}
+}
+
+func checkLastAndProposed(chain *blockchain.Chain, block *blockchain.Block) bool {
+	lastBlock := chain.LastBlock()
+	if lastBlock.IsSameAsBlock(block) {
+		return true
+	}
+
+	proposed := chain.Proposed
+	if proposed != nil && proposed.IsSameAsBlock(block) {
+		return true
+	}
+
+	return false
 }

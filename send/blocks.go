@@ -3,6 +3,8 @@ package send
 import (
 	"fmt"
 
+	"github.com/astromechio/astrocache/model/actions"
+
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
@@ -114,6 +116,74 @@ func CheckBlockWithVerifiers(block *blockchain.Block, verifiers []*model.Node, t
 func sendBlockCheck(url string, req *requests.CheckBlockRequest, resultChan chan bool) {
 	if err := transport.Post(url, req, nil); err != nil {
 		logger.LogError(errors.Wrap(err, "sendBlockCheck failed to Post"))
+		resultChan <- false
+	}
+
+	resultChan <- true
+}
+
+// DistributeBlockToWorkers sends a block to all workers
+func DistributeBlockToWorkers(block *blockchain.Block, workers []*model.Node, thisNode *model.Node) error {
+	req := &requests.ProposeBlockRequest{
+		Block:    block,
+		MinerNID: thisNode.NID,
+	}
+
+	realWorkers := []*model.Node{}
+
+	// we don't want to send node added blocks back to the master, so we
+	// have to be hacky and remove the maste node
+	if block.ActionType == actions.ActionTypeNodeAdded {
+		for i, w := range workers {
+			if w.Type != model.NodeTypeMaster {
+				realWorkers = append(realWorkers, workers[i])
+			}
+		}
+	} else {
+		realWorkers = workers
+	}
+
+	if len(realWorkers) == 0 {
+		return nil
+	}
+
+	logger.LogInfo(fmt.Sprintf("DistributeBlockToWorkers distributing block with ID %s to %d workers", block.ID, len(realWorkers)))
+
+	resultChan := make(chan bool)
+
+	numFailed := 0
+	numSucceeded := 0
+
+	for _, w := range realWorkers {
+		reqURL := transport.URLFromAddressAndPath(w.Address, "v1/worker/block")
+
+		go distributeBlock(reqURL, req, resultChan)
+	}
+
+	for true {
+		succeeded := <-resultChan
+
+		if succeeded {
+			numSucceeded++
+		} else {
+			numFailed++
+		}
+
+		if numSucceeded+numFailed == len(realWorkers) {
+			break
+		}
+	}
+
+	if numFailed > 0 {
+		return fmt.Errorf("DistributeBlockToWorkers failed to distribute block with ID %s to %d workers", block.ID, numFailed)
+	}
+
+	return nil
+}
+
+func distributeBlock(url string, req *requests.ProposeBlockRequest, resultChan chan bool) {
+	if err := transport.Post(url, req, nil); err != nil {
+		logger.LogError(errors.Wrap(err, "distributeBlock failed to Post"))
 		resultChan <- false
 	}
 

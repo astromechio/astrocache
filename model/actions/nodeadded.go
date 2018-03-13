@@ -8,6 +8,7 @@ import (
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
+	"github.com/pkg/errors"
 )
 
 // NodeAdded is a block value representing a new node in the network
@@ -43,6 +44,18 @@ func (na *NodeAdded) Execute(app *config.App) error {
 
 	if na.Node.NID == app.Self.NID {
 		logger.LogInfo("NodeAdded.Execute tried to add self, skipping...")
+		return nil
+	}
+
+	pubKey, err := acrypto.KeyPairFromPubKeyJSON(na.Node.PubKey)
+	if err != nil {
+		return errors.Wrap(err, "NodeAdded.Execute failed to KeyPairFromPubKeyJSON")
+	}
+
+	app.KeySet.AddKeyPair(pubKey)
+
+	// worker nodes only need to know about the master and their verifier, so skip the rest
+	if app.Self.Type == model.NodeTypeWorker {
 		return nil
 	}
 

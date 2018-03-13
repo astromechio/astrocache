@@ -3,6 +3,7 @@ package workers
 import (
 	"os"
 
+	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/actions"
 
 	"github.com/astromechio/astrocache/config"
@@ -51,6 +52,11 @@ func StartActionWorker(app *config.App) {
 		if err := action.Execute(app); err != nil {
 			logger.LogError(errors.Wrap(err, "StartActionWorker failed to Execute for block with ID "+block.ID))
 			continue
+		} else {
+			if app.Self.Type == model.NodeTypeVerifier {
+				// distribute the block to all worker nodes we care about
+				chain.DistributeChan <- block
+			}
 		}
 	}
 }
