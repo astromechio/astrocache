@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/astromechio/astrocache/model/actions"
@@ -34,8 +35,19 @@ func SetValueHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		errChan := app.Chain.AddNewBlock(block)
-		if err := <-errChan; err != nil {
+		for i := 0; i < 3; i++ {
+			errChan := app.Chain.AddNewBlock(block, app.Self.NID)
+			if err := <-errChan; err != nil {
+				logger.LogError(errors.Wrap(err, fmt.Sprintf("SetValueHandler failed to AddNewBlock, will retry %d more times", 3-1)))
+				// we want to try for a new place in the chain
+				block.Strip()
+				continue
+			} else {
+				break
+			}
+		}
+
+		if block.ID == "" || block.Signature == nil {
 			transport.Conflict(w)
 			return
 		}

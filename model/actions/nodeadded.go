@@ -70,7 +70,7 @@ func (na *NodeAdded) Execute(app *config.App) error {
 			logger.LogWarn("NodeAdded.Execute tried to set a master node when one already exists, skipping...")
 		}
 	} else {
-		return fmt.Errorf("NodeAdded.Execute tried to add node with unknown type %s", na.Node.Type)
+		return fmt.Errorf("NodeAdded.Execute tried to add node with unknown type %q", na.Node.Type)
 	}
 
 	return nil

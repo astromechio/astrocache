@@ -45,7 +45,7 @@ func GetValueHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		w.Write([]byte(val))
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(val))
 	}
 }

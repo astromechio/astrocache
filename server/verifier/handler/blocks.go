@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/astromechio/astrocache/model/blockchain"
-
 	"github.com/astromechio/astrocache/config"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model/requests"
@@ -27,10 +25,11 @@ func ProposeAddBlockHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		errChan := chain.AddNewBlock(proposeReq.Block)
+		errChan := chain.VerifyProposedBlock(proposeReq.Block, proposeReq.ProposingNID)
 		if err := <-errChan; err != nil {
 			logger.LogError(errors.Wrap(err, "ProposeAddBlockHandler failed to AddNewBlock"))
 			transport.Conflict(w)
+			return
 		}
 
 		transport.Ok(w)
@@ -51,36 +50,8 @@ func CheckBlockHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		if checkLastAndProposed(chain, checkReq.Block) {
-			transport.Ok(w)
-			return
-		}
-
-		var block *blockchain.Block
-
-		proposedChan := chain.GetNextProposed() // blocks until proposed is set
-		committedChan := chain.GetNextCommitted()
-
-		for true {
-			select {
-			case block = <-proposedChan:
-				break
-			case block = <-committedChan:
-				break
-			default:
-				if checkLastAndProposed(chain, checkReq.Block) {
-					logger.LogInfo("Checked against chain; succeeded")
-					transport.Ok(w)
-					return
-				}
-			}
-
-		}
-
-		logger.LogInfo("Checking against new block with ID " + block.ID)
-
-		if !block.IsSameAsBlock(checkReq.Block) {
-			logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %s, is not same as new block", checkReq.Block.ID))
+		if !chain.HasProposedOrCommittedBlock(checkReq.Block) {
+			logger.LogError(fmt.Errorf("CheckBlockHandler failed to HasProposedOrCommittedBlock for block with ID %q", checkReq.Block.ID))
 			transport.Conflict(w)
 			return
 		}
@@ -89,16 +60,32 @@ func CheckBlockHandler(app *config.App) http.HandlerFunc {
 	}
 }
 
-func checkLastAndProposed(chain *blockchain.Chain, block *blockchain.Block) bool {
-	lastBlock := chain.LastBlock()
-	if lastBlock.IsSameAsBlock(block) {
-		return true
-	}
+// // If that failed, we now have to do a convoluted channel dance to wait for the right block to come around
+// var block *blockchain.Block
 
-	proposed := chain.Proposed
-	if proposed != nil && proposed.IsSameAsBlock(block) {
-		return true
-	}
+// proposedChan := chain.GetNextProposed() // blocks until proposed is set
+// committedChan := chain.GetNextCommitted()
 
-	return false
-}
+// for true {
+// 	select {
+// 	case block = <-proposedChan:
+// 		break
+// 	case block = <-committedChan:
+// 		break
+// 	default:
+// 		if checkLastAndProposed(chain, checkReq.Block) {
+// 			logger.LogInfo("Checked against chain; succeeded")
+// 			transport.Ok(w)
+// 			return
+// 		}
+// 	}
+
+// }
+
+// logger.LogInfo("Checking against new block with ID " + block.ID)
+
+// if !block.IsSameAsBlock(checkReq.Block) {
+// 	logger.LogError(fmt.Errorf("CheckBlockHandler failed to check block %q, is not same as new block", checkReq.Block.ID))
+// 	transport.Conflict(w)
+// 	return
+// }

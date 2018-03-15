@@ -16,8 +16,8 @@ import (
 // ProposeBlockToVerifiers proposes a block and decides if the verifiers will accept it
 func ProposeBlockToVerifiers(block *blockchain.Block, verifiers []*model.Node, thisNode *model.Node) error {
 	req := &requests.ProposeBlockRequest{
-		Block:    block,
-		MinerNID: thisNode.NID,
+		Block:        block,
+		ProposingNID: thisNode.NID,
 	}
 
 	// handle the single verifier case
@@ -52,6 +52,8 @@ func ProposeBlockToVerifiers(block *blockchain.Block, verifiers []*model.Node, t
 		}
 	}
 
+	logger.LogInfo(fmt.Sprintf("ProposeBlockToVerifiers got %d matches and %d mismatches", numMatch, numMismatch))
+
 	if numMismatch > 0 {
 		return fmt.Errorf("ProposeBlockToVerifiers failed to add pending block: %d verifiers reported ID mismatch", numMismatch)
 	}
@@ -69,21 +71,28 @@ func sendBlockProposal(url string, req *requests.ProposeBlockRequest, resultChan
 }
 
 // CheckBlockWithVerifiers proposes a block and decides if the verifiers will accept it
-func CheckBlockWithVerifiers(block *blockchain.Block, verifiers []*model.Node, thisNode *model.Node) error {
+func CheckBlockWithVerifiers(block *blockchain.Block, verifiers []*model.Node, propNID string) error {
 	req := &requests.CheckBlockRequest{
 		Block: block,
 	}
 
+	actualVerifiers := []*model.Node{}
+	for i, v := range verifiers {
+		if v.NID != propNID {
+			actualVerifiers = append(actualVerifiers, verifiers[i])
+		}
+	}
+
 	// handle the single verifier case
-	if len(verifiers) == 0 {
+	if len(actualVerifiers) == 0 {
 		return nil
 	}
 
-	logger.LogInfo(fmt.Sprintf("CheckBlockWithVerifiers checking block with %d verifiers", len(verifiers)))
+	logger.LogInfo(fmt.Sprintf("CheckBlockWithVerifiers checking block with %d verifiers and propNID %q", len(actualVerifiers), propNID))
 
 	resultChan := make(chan bool)
 
-	for _, v := range verifiers {
+	for _, v := range actualVerifiers {
 		reqURL := transport.URLFromAddressAndPath(v.Address, req.Path())
 
 		go sendBlockCheck(reqURL, req, resultChan)
@@ -101,10 +110,12 @@ func CheckBlockWithVerifiers(block *blockchain.Block, verifiers []*model.Node, t
 			numMismatch++
 		}
 
-		if numMatch+numMismatch == len(verifiers) {
+		if numMatch+numMismatch == len(actualVerifiers) {
 			break
 		}
 	}
+
+	logger.LogInfo(fmt.Sprintf("CheckBlockWithVerifiers got %d matches and %d mismatches", numMatch, numMismatch))
 
 	if numMismatch > 0 {
 		return fmt.Errorf("CheckBlockWithVerifiers failed to check pending block: %d verifiers reported ID mismatch", numMismatch)
@@ -125,8 +136,8 @@ func sendBlockCheck(url string, req *requests.CheckBlockRequest, resultChan chan
 // DistributeBlockToWorkers sends a block to all workers
 func DistributeBlockToWorkers(block *blockchain.Block, workers []*model.Node, thisNode *model.Node) error {
 	req := &requests.ProposeBlockRequest{
-		Block:    block,
-		MinerNID: thisNode.NID,
+		Block:        block,
+		ProposingNID: thisNode.NID,
 	}
 
 	realWorkers := []*model.Node{}
@@ -147,7 +158,7 @@ func DistributeBlockToWorkers(block *blockchain.Block, workers []*model.Node, th
 		return nil
 	}
 
-	logger.LogInfo(fmt.Sprintf("DistributeBlockToWorkers distributing block with ID %s to %d workers", block.ID, len(realWorkers)))
+	logger.LogInfo(fmt.Sprintf("DistributeBlockToWorkers distributing block with ID %q to %d workers", block.ID, len(realWorkers)))
 
 	resultChan := make(chan bool)
 
@@ -175,7 +186,7 @@ func DistributeBlockToWorkers(block *blockchain.Block, workers []*model.Node, th
 	}
 
 	if numFailed > 0 {
-		return fmt.Errorf("DistributeBlockToWorkers failed to distribute block with ID %s to %d workers", block.ID, numFailed)
+		return fmt.Errorf("DistributeBlockToWorkers failed to distribute block with ID %q to %d workers", block.ID, numFailed)
 	}
 
 	return nil

@@ -92,11 +92,11 @@ func (sk *SymKey) Encrypt(src []byte) (*Message, error) {
 // Decrypt returns decrypted data from a Message
 func (sk *SymKey) Decrypt(src *Message) ([]byte, error) {
 	if src.KID != sk.KID {
-		return nil, fmt.Errorf("attempting to decrypt message with KID %s with symKey %s", src.KID, sk.KID)
+		return nil, fmt.Errorf("attempting to decrypt message with KID %q with symKey %q", src.KID, sk.KID)
 	}
 
 	if src.KeyType != KeyTypeSymmetric {
-		return nil, fmt.Errorf("attempting to decrypt message encrypted with %s with key of type %s", src.KeyType, KeyTypeSymmetric)
+		return nil, fmt.Errorf("attempting to decrypt message encrypted with %q with key of type %q", src.KeyType, KeyTypeSymmetric)
 	}
 
 	rawKey, err := sk.rawKey()

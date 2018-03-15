@@ -11,8 +11,8 @@ import (
 
 // ProposeBlockRequest contains information for adding a new node
 type ProposeBlockRequest struct {
-	Block    *blockchain.Block `json:"block"`
-	MinerNID string            `json:"minerNid"`
+	Block        *blockchain.Block `json:"block"`
+	ProposingNID string            `json:"minerNid"`
 }
 
 // Path returns the path for a new node request
@@ -26,6 +26,7 @@ func (pb *ProposeBlockRequest) FromRequest(r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 
 	return json.Unmarshal(reqBody, pb)
 }
@@ -40,8 +41,8 @@ func (pb *ProposeBlockRequest) Verify() error {
 		return errors.New("pb.Block is nil")
 	}
 
-	if pb.MinerNID == "" {
-		return errors.New("pb.MinerNID is empty")
+	if pb.ProposingNID == "" {
+		return errors.New("pb.ProposingNID is empty")
 	}
 
 	return nil
@@ -63,6 +64,7 @@ func (cb *CheckBlockRequest) FromRequest(r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 
 	return json.Unmarshal(reqBody, cb)
 }

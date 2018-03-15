@@ -39,5 +39,5 @@ func UnmarshalAction(actionJSON []byte, actionType string) (Action, error) {
 		return action, nil
 	}
 
-	return nil, fmt.Errorf("UnmarshalAction unable to unmarshal: unknown action type %s", actionType)
+	return nil, fmt.Errorf("UnmarshalAction unable to unmarshal: unknown action type %q", actionType)
 }

@@ -39,15 +39,16 @@ func StartMaster() {
 	addrParts := strings.Split(app.Self.Address, ":")
 	port := addrParts[len(addrParts)-1]
 
-	logger.LogInfo(fmt.Sprintf("starting astrocache master node server on port %s\n", port))
+	logger.LogInfo(fmt.Sprintf("starting astrocache master node server on port %q\n", port))
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), router); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func startWorkers(app *config.App) {
-	go workers.StartActionWorker(app)
-	go workers.StartChainWorker(app)
+	go workers.ProposeWorker(app)
+	go workers.CommitWorker(app)
+	go workers.ActionWorker(app)
 }
 
 func generateConfig() (*config.App, error) {

@@ -30,7 +30,7 @@ func StartWorker() {
 
 	startWorkers(app)
 
-	go loadChain(app)
+	loadChain(app)
 
 	router := router(app)
 
@@ -44,8 +44,9 @@ func StartWorker() {
 }
 
 func startWorkers(app *config.App) {
-	go workers.StartActionWorker(app)
-	go workers.StartChainWorker(app)
+	go workers.ProposeWorker(app)
+	go workers.CommitWorker(app)
+	go workers.ActionWorker(app)
 }
 
 func generateConfig() (*config.App, error) {

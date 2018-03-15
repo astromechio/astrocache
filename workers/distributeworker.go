@@ -7,11 +7,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-// StartDistributeWorker starts the distribute worker
-func StartDistributeWorker(app *config.App) {
+// DistributeWorker starts the distribute worker
+func DistributeWorker(app *config.App) {
 	chain := app.Chain
 
-	logger.LogInfo("Starting distribute worker")
+	logger.LogInfo("starting distribute worker")
 
 	for true {
 		block := <-chain.DistributeChan
@@ -20,7 +20,7 @@ func StartDistributeWorker(app *config.App) {
 		workers := app.NodeList.WorkersForVerifierWithNID(app.Self.NID)
 
 		if err := send.DistributeBlockToWorkers(block, workers, app.Self); err != nil {
-			logger.LogError(errors.Wrap(err, "StartDistributeWorker failed to DistributeBlockToWorkers"))
+			logger.LogError(errors.Wrap(err, "DistributeWorker failed to DistributeBlockToWorkers"))
 		}
 	}
 }

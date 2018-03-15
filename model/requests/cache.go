@@ -32,6 +32,7 @@ func (sv *SetValueRequest) FromRequest(r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 
 	if err := json.Unmarshal(reqBody, sv); err != nil {
 		return err

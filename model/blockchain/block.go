@@ -80,7 +80,7 @@ func (b *Block) PrepareForCommit(sigKey *acrypto.KeyPair, prev *Block) error {
 		}
 
 		if sigKey.KID != acrypto.MasterKeyPairKID {
-			return fmt.Errorf("PrepareForCommit attempted to prepare a genesis block with a non-master keyPair with KID %s", sigKey.KID)
+			return fmt.Errorf("PrepareForCommit attempted to prepare a genesis block with a non-master keyPair with KID %q", sigKey.KID)
 		}
 
 		signingBody = append([]byte(genesisBlockID), b.Data.Data...)
@@ -115,13 +115,13 @@ func (b *Block) Verify(keySet *acrypto.KeySet, prev *Block) error {
 
 	sigKey := keySet.KeyPairWithKID(b.Signature.KID)
 	if sigKey == nil {
-		return fmt.Errorf("Verify unable to find sigKey with KID %s", b.Signature.KID)
+		return fmt.Errorf("Verify unable to find sigKey with KID %q", b.Signature.KID)
 	}
 
 	// handle the genesis block case
 	if prev == nil {
 		if sigKey.KID != acrypto.MasterKeyPairKID {
-			return fmt.Errorf("Verify attempted to verify genesis block with non-master keyPair with KID %s", sigKey.KID)
+			return fmt.Errorf("Verify attempted to verify genesis block with non-master keyPair with KID %q", sigKey.KID)
 		}
 
 		if b.ID != genesisBlockID {
@@ -131,6 +131,11 @@ func (b *Block) Verify(keySet *acrypto.KeySet, prev *Block) error {
 		signingBody = append([]byte(genesisBlockID), b.Data.Data...)
 		newID = genesisBlockID
 	} else {
+		// we can say this is fine because the commit worker will skip duplicates
+		if b.IsSameAsBlock(prev) {
+			return nil
+		}
+
 		prevHash, err := prev.Hash()
 		if err != nil {
 			return errors.Wrap(err, "Verify failed to prev.Hash")
@@ -141,7 +146,7 @@ func (b *Block) Verify(keySet *acrypto.KeySet, prev *Block) error {
 	}
 
 	if b.ID != newID {
-		return fmt.Errorf("Verify failed, block ID %s does not match prev.Hash %s", b.ID, newID)
+		return fmt.Errorf("Verify failed, block ID %q does not match prev.Hash %q", b.ID, newID)
 	}
 
 	if result := sigKey.Verify(signingBody, b.Signature); result == acrypto.AstroSigUnverified {
@@ -149,6 +154,13 @@ func (b *Block) Verify(keySet *acrypto.KeySet, prev *Block) error {
 	}
 
 	return nil
+}
+
+// Strip removes everything but the data and the action type
+func (b *Block) Strip() {
+	b.ID = ""
+	b.Signature = nil
+	b.PrevID = ""
 }
 
 // IsSameAsBlock compares one block to another to determine if they are identical

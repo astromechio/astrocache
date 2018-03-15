@@ -29,7 +29,7 @@ func StartVerifier() {
 
 	startWorkers(app)
 
-	go loadChain(app)
+	loadChain(app)
 
 	router := router(app)
 
@@ -43,9 +43,10 @@ func StartVerifier() {
 }
 
 func startWorkers(app *config.App) {
-	go workers.StartDistributeWorker(app)
-	go workers.StartActionWorker(app)
-	go workers.StartChainWorker(app)
+	go workers.ProposeWorker(app)
+	go workers.CommitWorker(app)
+	go workers.ActionWorker(app)
+	go workers.DistributeWorker(app)
 }
 
 func generateConfig() (*config.App, error) {

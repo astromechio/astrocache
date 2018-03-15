@@ -74,11 +74,11 @@ func (akp *KeyPair) Decrypt(src *Message) ([]byte, error) {
 	}
 
 	if src.KeyType != KeyTypePair {
-		return nil, fmt.Errorf("attempting to decrypt message encrypted with %s with key of type %s", src.KeyType, KeyTypePair)
+		return nil, fmt.Errorf("attempting to decrypt message encrypted with %q with key of type %q", src.KeyType, KeyTypePair)
 	}
 
 	if src.KID != akp.KID {
-		return nil, fmt.Errorf("attempted to decrypt message with KID %s with keyPair %s", src.KID, akp.KID)
+		return nil, fmt.Errorf("attempted to decrypt message with KID %q with keyPair %q", src.KID, akp.KID)
 	}
 
 	decMsg, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, akp.Private, src.Data, nil)

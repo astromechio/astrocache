@@ -39,7 +39,7 @@ func (sv *SetValue) JSON() []byte {
 // Execute adds the node to the node list
 func (sv *SetValue) Execute(app *config.App) error {
 	if app.Self.Type == model.NodeTypeWorker {
-		logger.LogInfo(fmt.Sprintf("Setting value %s for key %s", sv.Value, sv.Key))
+		logger.LogInfo(fmt.Sprintf("Setting value %q for key %q", sv.Value, sv.Key))
 
 		app.Cache.SetValueForKey(sv.Value, sv.Key)
 	}

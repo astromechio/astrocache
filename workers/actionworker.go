@@ -12,8 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// StartActionWorker decrypts blocks and performs the actions therein
-func StartActionWorker(app *config.App) {
+// ActionWorker decrypts blocks and performs the actions therein
+func ActionWorker(app *config.App) {
 	if app.Chain == nil {
 		logger.LogError(errors.New("StartChainWorker received nil chain, terminating"))
 		os.Exit(1)
@@ -26,31 +26,31 @@ func StartActionWorker(app *config.App) {
 
 	chain := app.Chain
 
-	logger.LogInfo("Starting action worker")
+	logger.LogInfo("starting action worker")
 
 	for true {
 		block := <-chain.ActionChan
 
 		if block == nil {
-			logger.LogWarn("StartActionWorker received nil block, continuing..")
+			logger.LogWarn("ActionWorker received nil block, continuing..")
 		}
 
 		actionJSON, err := app.KeySet.GlobalKey.Decrypt(block.Data)
 		if err != nil {
-			logger.LogError(errors.Wrap(err, "StartActionWorker failed to Decrypt for block with ID "+block.ID))
+			logger.LogError(errors.Wrap(err, "ActionWorker failed to Decrypt for block with ID "+block.ID))
 			continue
 		}
 
 		action, err := actions.UnmarshalAction(actionJSON, block.ActionType)
 		if err != nil {
-			logger.LogError(errors.Wrap(err, "StartActionWorker failed to unmarshalAction for block with ID "+block.ID))
+			logger.LogError(errors.Wrap(err, "ActionWorker failed to unmarshalAction for block with ID "+block.ID))
 			continue
 		}
 
-		logger.LogInfo("Executing action (type " + action.ActionType() + ") from block with ID " + block.ID)
+		logger.LogInfo("executing action (type " + action.ActionType() + ") from block with ID " + block.ID)
 
 		if err := action.Execute(app); err != nil {
-			logger.LogError(errors.Wrap(err, "StartActionWorker failed to Execute for block with ID "+block.ID))
+			logger.LogError(errors.Wrap(err, "ActionWorker failed to Execute for block with ID "+block.ID))
 			continue
 		} else {
 			if app.Self.Type == model.NodeTypeVerifier {

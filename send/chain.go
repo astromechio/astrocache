@@ -18,3 +18,15 @@ func GetEntireChain(masterNode *model.Node) ([]*blockchain.Block, error) {
 
 	return blocks, nil
 }
+
+// GetBlocksAfter requests the entire chain from the master node
+func GetBlocksAfter(masterNode *model.Node, afterID string) ([]*blockchain.Block, error) {
+	url := transport.URLFromAddressAndPath(masterNode.Address, "v1/master/chain/after/"+afterID)
+
+	blocks := []*blockchain.Block{}
+	if err := transport.Get(url, &blocks); err != nil {
+		return nil, errors.Wrap(err, "GetBlocksAfter failed to Get")
+	}
+
+	return blocks, nil
+}

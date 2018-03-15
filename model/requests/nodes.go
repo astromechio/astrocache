@@ -37,6 +37,7 @@ func (nr *NewNodeRequest) FromRequest(r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	defer r.Body.Close()
 
 	return json.Unmarshal(reqBody, nr)
 }
@@ -52,7 +53,7 @@ func (nr *NewNodeRequest) Verify() error {
 	}
 
 	if nr.Node.Type != model.NodeTypeVerifier && nr.Node.Type != model.NodeTypeWorker {
-		return fmt.Errorf("nr.NodeType is %s, must be verifier or worker", nr.Node.Type)
+		return fmt.Errorf("nr.NodeType is %q, must be verifier or worker", nr.Node.Type)
 	}
 
 	if len(nr.Node.PubKey) == 0 {

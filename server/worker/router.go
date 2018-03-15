@@ -13,8 +13,8 @@ func router(app *config.App) *mux.Router {
 
 	mux.Methods(http.MethodPost).Path("/v1/worker/block").HandlerFunc(handler.AddBlockHandler(app))
 
-	mux.Methods(http.MethodPost).Path("/v1/value/{key}").HandlerFunc(handler.SetValueHandler(app))
 	mux.Methods(http.MethodGet).Path("/v1/value/{key}").HandlerFunc(handler.GetValueHandler(app))
+	mux.Methods(http.MethodPost).Path("/v1/value/{key}").HandlerFunc(handler.SetValueHandler(app))
 
 	return mux
 }

@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io/ioutil"
-	"log"
 	mrand "math/rand"
 	"net/http"
 	"time"
@@ -22,14 +21,14 @@ func main() {
 
 	nodes := []*model.Node{
 		&model.Node{
-			Address: "localhost:3003",
-		},
-		&model.Node{
 			Address: "localhost:3005",
 		},
 		&model.Node{
 			Address: "localhost:3006",
 		},
+		// &model.Node{
+		// 	Address: "localhost:3007",
+		// },
 		// &model.Node{
 		// 	Address: "localhost:3008",
 		// },
@@ -40,64 +39,123 @@ func main() {
 
 	start := time.Now()
 
-	for i := 0; i < 40; i++ {
+	for i := 0; i < 1; i++ {
 		valSet = reloadVals(valSet)
 
 		setAllVals(valSet, nodes)
 	}
 
-	checkAllVals(valSet, nodes)
+	//checkAllVals(valSet, nodes)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1; i++ {
 		valSet = reloadVals(valSet)
 
 		setAllVals(valSet, nodes)
 	}
 
-	checkAllVals(valSet, nodes)
+	//checkAllVals(valSet, nodes)
 
 	finish := time.Now()
 
 	duration := finish.Sub(start)
-	fmt.Printf("Test took %f s", duration.Seconds())
+	fmt.Printf("Test took %f s\n", duration.Seconds())
 }
 
 func setAllVals(valSet map[string]string, nodes []*model.Node) {
-	for key, val := range valSet {
-		setValRequest := &requests.SetValueRequest{
-			Key:   key,
-			Value: val,
-		}
+	resultChan := make(chan error)
+	count := 0
+	numFailed := 0
+	numSucceeded := 0
 
+	for key, val := range valSet {
 		index := mrand.Intn(len(nodes))
 		node := nodes[index]
 
-		if err := send.SetValue(setValRequest, node); err != nil {
-			log.Fatal(err)
+		count++
+		go setVal(key, val, node, resultChan)
+	}
+
+	for true {
+		if err := <-resultChan; err != nil {
+			fmt.Println(err.Error())
+			numFailed++
+		} else {
+			numSucceeded++
+		}
+
+		if numFailed+numSucceeded == count {
+			break
 		}
 	}
+
+	fmt.Printf("Set %d values with %d successes and %d failures\n", count, numSucceeded, numFailed)
+}
+
+func setVal(key, val string, node *model.Node, result chan error) {
+	setValRequest := &requests.SetValueRequest{
+		Key:   key,
+		Value: val,
+	}
+
+	if err := send.SetValue(setValRequest, node); err != nil {
+		result <- err
+	}
+
+	result <- nil
 }
 
 func checkAllVals(valSet map[string]string, nodes []*model.Node) {
-	for key, actual := range valSet {
+	resultChan := make(chan error)
+	count := 0
+	numFailed := 0
+	numSucceeded := 0
+
+	for key, val := range valSet {
 		index := mrand.Intn(len(nodes))
 		node := nodes[index]
 
-		url := transport.URLFromAddressAndPath(node.Address, "v1/value/"+key)
-
-		req, _ := http.NewRequest(http.MethodGet, url, nil)
-
-		res, err := http.DefaultClient.Do(req)
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		val := string(body)
-
-		fmt.Printf("Got value %s, should be %s\n", val, actual)
+		count++
+		go checkVal(key, val, node, resultChan)
 	}
 
+	for true {
+		if err := <-resultChan; err != nil {
+			fmt.Println(err.Error())
+			numFailed++
+		} else {
+			numSucceeded++
+		}
+
+		if numFailed+numSucceeded == count {
+			break
+		}
+	}
+
+	fmt.Printf("Got %d values with %d successes and %d failures\n", count, numSucceeded, numFailed)
+}
+
+func checkVal(key, val string, node *model.Node, result chan error) {
+	url := transport.URLFromAddressAndPath(node.Address, "v1/value/"+key)
+
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+
+	res, err := transport.HttpClient().Do(req)
+	if err != nil {
+		result <- err
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		result <- err
+	}
+	defer res.Body.Close()
+
+	gotVal := string(body)
+	if gotVal != val {
+		result <- fmt.Errorf("Got %q, shold be %q", gotVal, val)
+	}
+
+	result <- nil
 }
 
 func randomString() string {
@@ -110,7 +168,7 @@ func randomString() string {
 func loadVals() map[string]string {
 	newSet := make(map[string]string)
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		key := randomString()
 		val := randomString()
 

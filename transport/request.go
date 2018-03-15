@@ -24,19 +24,20 @@ func Post(url string, req requests.Request, res interface{}) error {
 		return errors.Wrap(err, "Post failed to NewRequest")
 	}
 
-	response, err := http.DefaultClient.Do(postRequest)
+	response, err := HttpClient().Do(postRequest)
 	if err != nil {
 		return errors.Wrap(err, "Post failed to Do")
 	}
 
 	if response.StatusCode != 200 {
-		return fmt.Errorf("Post (%s) returned non-200 status code %d", url, response.StatusCode)
+		return fmt.Errorf("Post (%q) returned non-200 status code %d", url, response.StatusCode)
 	}
 
 	resBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return errors.Wrap(err, "Post failed to ReadAll")
 	}
+	defer response.Body.Close()
 
 	if res != nil {
 		if err := json.Unmarshal(resBody, res); err != nil {
@@ -54,19 +55,20 @@ func Get(url string, res interface{}) error {
 		return errors.Wrap(err, "Get failed to NewRequest")
 	}
 
-	response, err := http.DefaultClient.Do(getRequest)
+	response, err := HttpClient().Do(getRequest)
 	if err != nil {
 		return errors.Wrap(err, "Get failed to Do")
 	}
 
 	if response.StatusCode != 200 {
-		return fmt.Errorf("Post (%s) returned non-200 status code %d", url, response.StatusCode)
+		return fmt.Errorf("Get (%q) returned non-200 status code %d", url, response.StatusCode)
 	}
 
 	resBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return errors.Wrap(err, "Get failed to ReadAll")
 	}
+	defer response.Body.Close()
 
 	if res != nil {
 		if err := json.Unmarshal(resBody, res); err != nil {
@@ -75,6 +77,26 @@ func Get(url string, res interface{}) error {
 	}
 
 	return nil
+}
+
+func HttpClient() *http.Client {
+	// Customize the Transport to have larger connection pool
+	defaultRoundTripper := http.DefaultTransport
+	defaultTransportPointer, ok := defaultRoundTripper.(*http.Transport)
+	if !ok {
+		panic(fmt.Sprintf("defaultRoundTripper not an *http.Transport"))
+	}
+
+	defaultTransport := *defaultTransportPointer // dereference it to get a copy of the struct that the pointer points to
+	defaultTransport.MaxIdleConns = 100
+	defaultTransport.MaxIdleConnsPerHost = 100
+
+	myClient := &http.Client{
+		Transport: &defaultTransport,
+		// Timeout:   time.Millisecond * 1000,
+	}
+
+	return myClient
 }
 
 // URLFromAddressAndPath creates a URL from a root address and a path

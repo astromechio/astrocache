@@ -11,38 +11,62 @@ import (
 
 // Chain represents a blockchain
 type Chain struct {
-	Blocks         []*Block
-	Proposed       *Block
-	WorkerChan     chan (*NewBlockJob) // WorkerChan is used by verifier_chainworker as the synchronization method for mining and verifying new blocks
-	ActionChan     chan (*Block)       // ActionChan decrypts blocks and applies actions
-	DistributeChan chan (*Block)       // DistributeChan loads blocks needed to be distributed to workers
-	ProposedChan   chan (*Block)       // ProposedChan is used when a goroutine needs to know the next time a block is proposed. It may or may not be nil
-	CommittedChan  chan (*Block)       // CommittedChan is used when a goroutine needs to know the next time a block is committed. It may or may not be nil
+	Blocks   []*Block
+	Proposed *Block
+
+	ProposeChan chan (*NewBlockJob) // ProposeChan is used by proposeworker as the synchronization method for proposing blocks
+	VerifyChan  chan (*NewBlockJob) // Check is used by proposeworker as the synchronization method for processing incoming blocks
+	CommitChan  chan (*NewBlockJob) // CommitChan is used by commitworker as the synchronization method for committing blocks
+
+	ProposedChan  chan (*Block) // ProposedChan is used when a goroutine needs to know the next time a block is proposed.
+	CommittedChan chan (*Block) // CommittedChan is used when a goroutine needs to know the next time a block is committed.
+
+	ActionChan     chan (*Block) // ActionChan decrypts blocks and applies actions
+	DistributeChan chan (*Block) // DistributeChan loads blocks needed to be distributed to workers
 }
 
 // NewBlockJob represents the intent to add a new block
 type NewBlockJob struct {
-	Block      *Block
-	ResultChan chan (error)
-	Check      bool
+	Block        *Block
+	ProposingNID string
+	ResultChan   chan (error)
+	Check        bool
 }
 
-// AddNewBlock queues a new block job
-func (c *Chain) AddNewBlock(block *Block) chan (error) {
+// AddNewBlock checks and then sets the proposed block
+func (c *Chain) AddNewBlock(block *Block, propNID string) chan error {
 	errChan := make(chan error, 1)
 
 	job := &NewBlockJob{
-		Block:      block,
-		ResultChan: errChan,
-		Check:      true,
+		Block:        block,
+		ProposingNID: propNID,
+		ResultChan:   errChan,
+		Check:        true,
 	}
 
-	c.WorkerChan <- job
+	c.sendProposeJob(job)
+
 	return errChan
 }
 
-// AddNewBlockUnchecked adds a new block without verifier check
-func (c *Chain) AddNewBlockUnchecked(block *Block) chan (error) {
+// VerifyProposedBlock checks and then sets the proposed block
+func (c *Chain) VerifyProposedBlock(block *Block, propNID string) chan error {
+	errChan := make(chan error, 1)
+
+	job := &NewBlockJob{
+		Block:        block,
+		ProposingNID: propNID,
+		ResultChan:   errChan,
+		Check:        true,
+	}
+
+	c.sendVerifyJob(job)
+
+	return errChan
+}
+
+// VerifyBlockUnchecked checks and then sets the proposed block
+func (c *Chain) VerifyBlockUnchecked(block *Block) chan error {
 	errChan := make(chan error, 1)
 
 	job := &NewBlockJob{
@@ -51,57 +75,17 @@ func (c *Chain) AddNewBlockUnchecked(block *Block) chan (error) {
 		Check:      false,
 	}
 
-	c.WorkerChan <- job
+	c.sendVerifyJob(job)
+
 	return errChan
 }
 
-// SetProposedBlock checks and then sets the proposed block
-func (c *Chain) SetProposedBlock(block *Block) error {
-	prevBlock := c.LastBlock()
-
-	if prevBlock == nil {
-		if block.ID != genesisBlockID {
-			return fmt.Errorf("SetProposedBlock tried to propose block with nil prevBlock and non-genesis ID %q", block.ID)
-		}
-	} else {
-		if prevBlock.ID != block.PrevID {
-			return fmt.Errorf("AddPendingBlock failed to add block: block.PrevID (%s) did not match prevBlock.ID (%s)", block.PrevID, prevBlock.ID)
-		}
-	}
-
-	c.Proposed = block
-
-	if c.ProposedChan != nil {
-		c.ProposedChan <- block
-		c.ProposedChan = nil
-	}
-
-	return nil
+func (c *Chain) sendProposeJob(job *NewBlockJob) {
+	c.ProposeChan <- job
 }
 
-// CommitProposedBlock verifies and commits a block
-func (c *Chain) CommitProposedBlock(keySet *acrypto.KeySet) error {
-	prevBlock := c.LastBlock()
-
-	// Verify handles the genesis case
-	if err := c.Proposed.Verify(keySet, prevBlock); err != nil {
-		return errors.Wrap(err, "CommitProposedBlock failed to block.Verify")
-	}
-
-	logger.LogInfo(fmt.Sprintf("*** Committing bock with ID %s ***", c.Proposed.ID))
-
-	c.Blocks = append(c.Blocks, c.Proposed)
-
-	c.ActionChan <- c.Proposed // send the block to be executed
-
-	if c.CommittedChan != nil {
-		c.CommittedChan <- c.Proposed
-		c.CommittedChan = nil
-	}
-
-	c.Proposed = nil
-
-	return nil
+func (c *Chain) sendVerifyJob(job *NewBlockJob) {
+	c.VerifyChan <- job
 }
 
 // LoadFromBlocks loads a chain from a block array
@@ -111,7 +95,7 @@ func (c *Chain) LoadFromBlocks(blocks []*Block) error {
 	}
 
 	for i := range blocks {
-		errChan := c.AddNewBlockUnchecked(blocks[i])
+		errChan := c.VerifyBlockUnchecked(blocks[i])
 		if err := <-errChan; err != nil {
 			return err
 		}
@@ -148,11 +132,56 @@ func (c *Chain) GetNextCommitted() chan *Block {
 	return notifChan
 }
 
+// HasProposedOrCommittedBlock checks if a block is proposed or previously committed
+func (c *Chain) HasProposedOrCommittedBlock(block *Block) bool {
+	if c.Proposed != nil && c.Proposed.IsSameAsBlock(block) {
+		return true
+	}
+
+	// check if the block being checked is the next to be committed
+	last := c.LastBlock()
+	if last != nil {
+		hash, err := last.Hash()
+		if err != nil {
+			return false
+		}
+
+		lastHashString := acrypto.Base64URLEncode(hash)
+		if lastHashString == block.ID {
+			return true
+		}
+	}
+
+	// if that fails, work backwards in the chain to see if any of them match
+	for i := len(c.Blocks) - 1; i > 0; i-- {
+		if c.Blocks[i].IsSameAsBlock(block) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// BlocksAfterID returns all the committed blocks after id
+func (c *Chain) BlocksAfterID(id string) []*Block {
+	for i := len(c.Blocks) - 1; i > 0; i-- {
+		if c.Blocks[i].ID == id {
+			return c.Blocks[i+1:]
+		}
+	}
+
+	return nil
+}
+
 // EmptyChain creates an enpty chain
 func EmptyChain() *Chain {
 	chain := &Chain{
-		Blocks:         []*Block{},
-		WorkerChan:     make(chan *NewBlockJob, 2),
+		Blocks:      []*Block{},
+		ProposeChan: make(chan *NewBlockJob),
+		VerifyChan:  make(chan *NewBlockJob, 20),
+		CommitChan:  make(chan *NewBlockJob, 2),
+		// ProposedChan:   make(chan *Block),
+		CommittedChan:  make(chan *Block, 1), // this is buffered because only the ProposeWorker cares about it
 		ActionChan:     make(chan *Block),
 		DistributeChan: make(chan *Block),
 	}
@@ -175,10 +204,14 @@ func BrandNewChain(masterKeyPair *acrypto.KeyPair, globalKey *acrypto.SymKey, bl
 		return nil, errors.Wrap(err, "BrandNewChain failed to NewBlockWithAction")
 	}
 
+	if err := genesis.PrepareForCommit(masterKeyPair, nil); err != nil {
+		return nil, errors.Wrap(err, "BrandNewChain failed to PrepareForCommit")
+	}
+
 	chain := EmptyChain()
 
 	// if this fails in the worker, we'll have to catch it and fatal
-	chain.AddNewBlock(genesis)
+	chain.Blocks = append(chain.Blocks, genesis)
 
 	return chain, nil
 }
