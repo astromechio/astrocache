@@ -39,7 +39,7 @@ func main() {
 
 	start := time.Now()
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 5; i++ {
 		valSet = reloadVals(valSet)
 
 		setAllVals(valSet, nodes)
@@ -47,7 +47,7 @@ func main() {
 
 	//checkAllVals(valSet, nodes)
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 5; i++ {
 		valSet = reloadVals(valSet)
 
 		setAllVals(valSet, nodes)

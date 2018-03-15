@@ -24,7 +24,7 @@ func AddBlockHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		errChan := chain.VerifyBlockUnchecked(proposeReq.Block)
+		errChan := chain.VerifyProposedBlock(proposeReq.Block, "")
 		if err := <-errChan; err != nil {
 			logger.LogError(errors.Wrap(err, "ProposeAddBlockHandler failed to AddNewBlock"))
 			transport.Conflict(w)

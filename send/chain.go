@@ -1,8 +1,10 @@
 package send
 
 import (
+	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
+	"github.com/astromechio/astrocache/model/requests"
 	"github.com/astromechio/astrocache/transport"
 	"github.com/pkg/errors"
 )
@@ -29,4 +31,22 @@ func GetBlocksAfter(masterNode *model.Node, afterID string) ([]*blockchain.Block
 	}
 
 	return blocks, nil
+}
+
+// RequestReservedID reserves a block ID with the master node
+func RequestReservedID(masterNode *model.Node, propNID string) (*requests.ReserveIDResponse, error) {
+	logger.LogInfo("RequestReservedID requesting block ID from master node")
+
+	req := &requests.ReserveIDRequest{
+		ProposingNID: propNID,
+	}
+
+	url := transport.URLFromAddressAndPath(masterNode.Address, req.Path())
+
+	resp := &requests.ReserveIDResponse{}
+	if err := transport.Post(url, req, &resp); err != nil {
+		return nil, errors.Wrap(err, "RequestReservedID failed to Get")
+	}
+
+	return resp, nil
 }

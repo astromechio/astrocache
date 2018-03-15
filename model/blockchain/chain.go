@@ -14,12 +14,14 @@ type Chain struct {
 	Blocks   []*Block
 	Proposed *Block
 
-	ProposeChan chan (*NewBlockJob) // ProposeChan is used by proposeworker as the synchronization method for proposing blocks
-	VerifyChan  chan (*NewBlockJob) // Check is used by proposeworker as the synchronization method for processing incoming blocks
-	CommitChan  chan (*NewBlockJob) // CommitChan is used by commitworker as the synchronization method for committing blocks
+	ReserveChan chan (*ReserveIDJob) // ReserveChan is used by reserveworker as the synchronization method for reserving block IDs
+	ProposeChan chan (*NewBlockJob)  // ProposeChan is used by proposeworker as the synchronization method for proposing blocks
+	VerifyChan  chan (*NewBlockJob)  // Check is used by proposeworker as the synchronization method for processing incoming blocks
+	CommitChan  chan (*NewBlockJob)  // CommitChan is used by commitworker as the synchronization method for committing blocks
 
-	ProposedChan  chan (*Block) // ProposedChan is used when a goroutine needs to know the next time a block is proposed.
-	CommittedChan chan (*Block) // CommittedChan is used when a goroutine needs to know the next time a block is committed.
+	ReservedChan  chan (*ReserveIDJob) // ReservedChan is used when a goroutine needs to know the next time a block is reserved.
+	ProposedChan  chan (*Block)        // ProposedChan is used when a goroutine needs to know the next time a block is proposed.
+	CommittedChan chan (*Block)        // CommittedChan is used when a goroutine needs to know the next time a block is committed.
 
 	ActionChan     chan (*Block) // ActionChan decrypts blocks and applies actions
 	DistributeChan chan (*Block) // DistributeChan loads blocks needed to be distributed to workers
@@ -30,7 +32,13 @@ type NewBlockJob struct {
 	Block        *Block
 	ProposingNID string
 	ResultChan   chan (error)
-	Check        bool
+}
+
+// ReserveIDJob respresents a reserved block ID
+type ReserveIDJob struct {
+	ProposingNID string
+	BlockID      string
+	ResultChan   chan (error)
 }
 
 // AddNewBlock checks and then sets the proposed block
@@ -41,7 +49,6 @@ func (c *Chain) AddNewBlock(block *Block, propNID string) chan error {
 		Block:        block,
 		ProposingNID: propNID,
 		ResultChan:   errChan,
-		Check:        true,
 	}
 
 	c.sendProposeJob(job)
@@ -57,7 +64,6 @@ func (c *Chain) VerifyProposedBlock(block *Block, propNID string) chan error {
 		Block:        block,
 		ProposingNID: propNID,
 		ResultChan:   errChan,
-		Check:        true,
 	}
 
 	c.sendVerifyJob(job)
@@ -65,19 +71,18 @@ func (c *Chain) VerifyProposedBlock(block *Block, propNID string) chan error {
 	return errChan
 }
 
-// VerifyBlockUnchecked checks and then sets the proposed block
-func (c *Chain) VerifyBlockUnchecked(block *Block) chan error {
-	errChan := make(chan error, 1)
+// ReserveBlockID checks and then sets the proposed block
+func (c *Chain) ReserveBlockID(propNID string) (chan error, *ReserveIDJob) {
+	resultChan := make(chan error, 1)
 
-	job := &NewBlockJob{
-		Block:      block,
-		ResultChan: errChan,
-		Check:      false,
+	job := &ReserveIDJob{
+		ProposingNID: propNID,
+		ResultChan:   resultChan,
 	}
 
-	c.sendVerifyJob(job)
+	c.sendReserveJob(job)
 
-	return errChan
+	return resultChan, job
 }
 
 func (c *Chain) sendProposeJob(job *NewBlockJob) {
@@ -88,6 +93,10 @@ func (c *Chain) sendVerifyJob(job *NewBlockJob) {
 	c.VerifyChan <- job
 }
 
+func (c *Chain) sendReserveJob(job *ReserveIDJob) {
+	c.ReserveChan <- job
+}
+
 // LoadFromBlocks loads a chain from a block array
 func (c *Chain) LoadFromBlocks(blocks []*Block) error {
 	if len(c.Blocks) > 0 {
@@ -95,7 +104,7 @@ func (c *Chain) LoadFromBlocks(blocks []*Block) error {
 	}
 
 	for i := range blocks {
-		errChan := c.VerifyBlockUnchecked(blocks[i])
+		errChan := c.VerifyProposedBlock(blocks[i], "")
 		if err := <-errChan; err != nil {
 			return err
 		}
@@ -176,12 +185,13 @@ func (c *Chain) BlocksAfterID(id string) []*Block {
 // EmptyChain creates an enpty chain
 func EmptyChain() *Chain {
 	chain := &Chain{
-		Blocks:      []*Block{},
-		ProposeChan: make(chan *NewBlockJob),
-		VerifyChan:  make(chan *NewBlockJob, 20),
-		CommitChan:  make(chan *NewBlockJob, 2),
-		// ProposedChan:   make(chan *Block),
-		CommittedChan:  make(chan *Block, 1), // this is buffered because only the ProposeWorker cares about it
+		Blocks:         []*Block{},
+		ReserveChan:    make(chan *ReserveIDJob, 2),
+		ProposeChan:    make(chan *NewBlockJob, 2),
+		VerifyChan:     make(chan *NewBlockJob, 2),
+		CommitChan:     make(chan *NewBlockJob, 2),
+		ReservedChan:   make(chan *ReserveIDJob, 2),
+		CommittedChan:  make(chan *Block, 2),
 		ActionChan:     make(chan *Block),
 		DistributeChan: make(chan *Block),
 	}

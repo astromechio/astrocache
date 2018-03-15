@@ -46,6 +46,7 @@ func StartMaster() {
 }
 
 func startWorkers(app *config.App) {
+	go workers.ReserveWorker(app)
 	go workers.ProposeWorker(app)
 	go workers.CommitWorker(app)
 	go workers.ActionWorker(app)

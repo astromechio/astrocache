@@ -62,7 +62,14 @@ func AddVerifierNodeHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		errChan := app.Chain.AddNewBlock(block, app.Self.NID)
+		errChan, _ := app.Chain.ReserveBlockID(app.Self.NID)
+		if err := <-errChan; err != nil {
+			logger.LogError(errors.Wrap(err, "SetValueHandler failed to ReserveBlockID"))
+			transport.InternalServerError(w)
+			return
+		}
+
+		errChan = app.Chain.AddNewBlock(block, app.Self.NID)
 		if err := <-errChan; err != nil {
 			logger.LogError(errors.Wrap(err, "AddVerifierNodeHandler failed to AddNewBlock"))
 			transport.InternalServerError(w)
@@ -131,7 +138,14 @@ func AddWorkerNodeHandler(app *config.App) http.HandlerFunc {
 			return
 		}
 
-		errChan := app.Chain.AddNewBlock(block, app.Self.NID)
+		errChan, _ := app.Chain.ReserveBlockID(app.Self.NID)
+		if err := <-errChan; err != nil {
+			logger.LogError(errors.Wrap(err, "SetValueHandler failed to ReserveBlockID"))
+			transport.InternalServerError(w)
+			return
+		}
+
+		errChan = app.Chain.AddNewBlock(block, app.Self.NID)
 		if err := <-errChan; err != nil {
 			logger.LogError(errors.Wrap(err, "AddWorkerNodeHandler failed to AddNewBlock"))
 			transport.InternalServerError(w)

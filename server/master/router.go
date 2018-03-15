@@ -18,6 +18,8 @@ func router(app *config.App) *mux.Router {
 	mux.Methods(http.MethodGet).Path("/v1/master/chain").HandlerFunc(handler.GetEntireChainHandler(app))
 	mux.Methods(http.MethodGet).Path("/v1/master/chain/after/{after}").HandlerFunc(handler.GetBlocksAfterHandler(app))
 
+	mux.Methods(http.MethodPost).Path("/v1/master/block/reserve").HandlerFunc(handler.ReserveIDHandler(app))
+
 	mux.Methods(http.MethodPost).Path("/v1/worker/block").HandlerFunc(whandler.AddBlockHandler(app))
 
 	return mux

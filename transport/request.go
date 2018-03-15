@@ -93,7 +93,7 @@ func HttpClient() *http.Client {
 
 	myClient := &http.Client{
 		Transport: &defaultTransport,
-		// Timeout:   time.Millisecond * 1000,
+		// Timeout:   time.Second * 2,
 	}
 
 	return myClient

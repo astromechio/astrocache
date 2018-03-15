@@ -31,34 +31,32 @@ func CommitWorker(app *config.App) {
 	for true {
 		blockJob := <-chain.CommitChan
 
+		logger.LogInfo("CommitWorker got commit job")
+
 		if blockJob.Block == nil {
 			logger.LogWarn("CommitWorker received nil block, continuing..")
 			continue
 		}
 
 		if err := commitBlock(blockJob, app); err != nil {
-			if blockJob.Check == false {
-				blockJob.ResultChan <- errors.Wrap(err, "CommitWorker failed to checkBlock")
-			} else {
-				logger.LogError(errors.Wrap(err, "CommitWorker failed to checkBlock and blockJob.ResultChan is closed"))
-			}
+			logger.LogError(errors.Wrap(err, "CommitWorker failed to checkBlock"))
+			blockJob.ResultChan <- errors.Wrap(err, "CommitWorker failed to checkBlock")
 
 			chain.Proposed = nil
 
 			chain.CommittedChan <- nil
-			loadMissingBlocks(app)
+			go loadMissingBlocks(app)
 
 			continue
 		}
 
-		// if check is false, then we are the proposer or there was no check to begin with
-		if blockJob.Check == false {
-			blockJob.ResultChan <- nil
-		}
+		blockJob.ResultChan <- nil
 
 		chain.ActionChan <- blockJob.Block // send the block to be executed
 
+		logger.LogInfo("CommitWorker completed commit job, reporting committed")
 		chain.CommittedChan <- blockJob.Block // notify other goroutines that something was committed
+		logger.LogInfo("CommitWorker completed commit job, reported committed")
 	}
 }
 
@@ -67,7 +65,7 @@ func commitBlock(job *blockchain.NewBlockJob, app *config.App) error {
 
 	logger.LogInfo(fmt.Sprintf("commitBlock committing block with ID %q", job.Block.ID))
 
-	if !job.Block.IsSameAsBlock(chain.Proposed) {
+	if chain.Proposed == nil || !job.Block.IsSameAsBlock(chain.Proposed) {
 		return fmt.Errorf("commitBlock tried to commit a non-proposed block")
 	}
 
@@ -77,17 +75,9 @@ func commitBlock(job *blockchain.NewBlockJob, app *config.App) error {
 		return nil
 	}
 
-	prevBlock := chain.LastBlock()
-
 	// Verify handles the genesis case
-	if err := job.Block.Verify(app.KeySet, prevBlock); err != nil {
+	if err := job.Block.Verify(app.KeySet, last); err != nil {
 		return errors.Wrap(err, "commitBlock failed to block.Verify")
-	}
-
-	if job.Check {
-		if err := send.CheckBlockWithVerifiers(job.Block, app.NodeList.Verifiers, job.ProposingNID); err != nil {
-			return errors.Wrap(err, "commitBlock failed to CheckBlockWithWorkers")
-		}
 	}
 
 	logger.LogInfo(fmt.Sprintf("*** Committing bock with ID %q ***", job.Block.ID))
@@ -126,7 +116,7 @@ func loadMissingBlocks(app *config.App) {
 	for i := range missing {
 		logger.LogInfo(fmt.Sprintf("loadMissingBlocks loading missing block with ID %q", missing[i].ID))
 
-		errChan := app.Chain.VerifyBlockUnchecked(missing[i])
+		errChan := app.Chain.VerifyProposedBlock(missing[i], "")
 		if err := <-errChan; err != nil {
 			logger.LogError(errors.Wrap(err, "loadMissingBlocks failed to AddNewBlockUnchecked for block with ID "+missing[i].ID))
 			return
