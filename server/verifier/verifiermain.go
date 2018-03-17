@@ -3,7 +3,7 @@ package verifier
 import (
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"os"
 	"strings"
 
@@ -14,8 +14,10 @@ import (
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
 	"github.com/astromechio/astrocache/send"
+	"github.com/astromechio/astrocache/server/verifier/service"
 	"github.com/astromechio/astrocache/workers"
 	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 // StartVerifier starts a master node
@@ -31,14 +33,21 @@ func StartVerifier() {
 
 	loadChain(app)
 
-	router := router(app)
-
 	addrParts := strings.Split(app.Self.Address, ":")
 	port := addrParts[len(addrParts)-1]
 
-	logger.LogInfo(fmt.Sprintf("starting astrocache verifier node server on port %s\n", port))
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), router); err != nil {
-		log.Fatal(err)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+
+	server := &service.VerifierService{App: app}
+	service.RegisterVerifierServer(s, server)
+
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
 	}
 }
 

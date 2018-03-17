@@ -1,7 +1,8 @@
 syntax = "proto3";
 
-service WorkerService {
+service Worker {
 	rpc AddBlock (AddBlockRequest) returns (AddBlockResponse);
+	rpc SetValue(SetValueRequest) returns (SetValueResponse);
 }
 
 message AddBlockRequest {
@@ -10,3 +11,19 @@ message AddBlockRequest {
 }
 
 message AddBlockResponse {}
+
+// Node defines a node in the network
+message Node {
+	string NID = 1;
+	string Address = 2;
+	string Type = 3;
+	bytes PubKey = 4;
+	string ParentNID = 5;
+}
+
+message SetValueRequest {
+	string Key = 1;
+	string Value = 2;
+}
+
+message SetValueResponse {}

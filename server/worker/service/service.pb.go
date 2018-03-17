@@ -10,6 +10,9 @@ It is generated from these files:
 It has these top-level messages:
 	AddBlockRequest
 	AddBlockResponse
+	Node
+	SetValueRequest
+	SetValueResponse
 */
 package service
 
@@ -65,9 +68,93 @@ func (m *AddBlockResponse) String() string            { return proto.CompactText
 func (*AddBlockResponse) ProtoMessage()               {}
 func (*AddBlockResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
+// Node defines a node in the network
+type Node struct {
+	NID       string `protobuf:"bytes,1,opt,name=NID" json:"NID,omitempty"`
+	Address   string `protobuf:"bytes,2,opt,name=Address" json:"Address,omitempty"`
+	Type      string `protobuf:"bytes,3,opt,name=Type" json:"Type,omitempty"`
+	PubKey    []byte `protobuf:"bytes,4,opt,name=PubKey,proto3" json:"PubKey,omitempty"`
+	ParentNID string `protobuf:"bytes,5,opt,name=ParentNID" json:"ParentNID,omitempty"`
+}
+
+func (m *Node) Reset()                    { *m = Node{} }
+func (m *Node) String() string            { return proto.CompactTextString(m) }
+func (*Node) ProtoMessage()               {}
+func (*Node) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *Node) GetNID() string {
+	if m != nil {
+		return m.NID
+	}
+	return ""
+}
+
+func (m *Node) GetAddress() string {
+	if m != nil {
+		return m.Address
+	}
+	return ""
+}
+
+func (m *Node) GetType() string {
+	if m != nil {
+		return m.Type
+	}
+	return ""
+}
+
+func (m *Node) GetPubKey() []byte {
+	if m != nil {
+		return m.PubKey
+	}
+	return nil
+}
+
+func (m *Node) GetParentNID() string {
+	if m != nil {
+		return m.ParentNID
+	}
+	return ""
+}
+
+type SetValueRequest struct {
+	Key   string `protobuf:"bytes,1,opt,name=Key" json:"Key,omitempty"`
+	Value string `protobuf:"bytes,2,opt,name=Value" json:"Value,omitempty"`
+}
+
+func (m *SetValueRequest) Reset()                    { *m = SetValueRequest{} }
+func (m *SetValueRequest) String() string            { return proto.CompactTextString(m) }
+func (*SetValueRequest) ProtoMessage()               {}
+func (*SetValueRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *SetValueRequest) GetKey() string {
+	if m != nil {
+		return m.Key
+	}
+	return ""
+}
+
+func (m *SetValueRequest) GetValue() string {
+	if m != nil {
+		return m.Value
+	}
+	return ""
+}
+
+type SetValueResponse struct {
+}
+
+func (m *SetValueResponse) Reset()                    { *m = SetValueResponse{} }
+func (m *SetValueResponse) String() string            { return proto.CompactTextString(m) }
+func (*SetValueResponse) ProtoMessage()               {}
+func (*SetValueResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+
 func init() {
 	proto.RegisterType((*AddBlockRequest)(nil), "AddBlockRequest")
 	proto.RegisterType((*AddBlockResponse)(nil), "AddBlockResponse")
+	proto.RegisterType((*Node)(nil), "Node")
+	proto.RegisterType((*SetValueRequest)(nil), "SetValueRequest")
+	proto.RegisterType((*SetValueResponse)(nil), "SetValueResponse")
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -78,64 +165,97 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for WorkerService service
+// Client API for Worker service
 
-type WorkerServiceClient interface {
+type WorkerClient interface {
 	AddBlock(ctx context.Context, in *AddBlockRequest, opts ...grpc.CallOption) (*AddBlockResponse, error)
+	SetValue(ctx context.Context, in *SetValueRequest, opts ...grpc.CallOption) (*SetValueResponse, error)
 }
 
-type workerServiceClient struct {
+type workerClient struct {
 	cc *grpc.ClientConn
 }
 
-func NewWorkerServiceClient(cc *grpc.ClientConn) WorkerServiceClient {
-	return &workerServiceClient{cc}
+func NewWorkerClient(cc *grpc.ClientConn) WorkerClient {
+	return &workerClient{cc}
 }
 
-func (c *workerServiceClient) AddBlock(ctx context.Context, in *AddBlockRequest, opts ...grpc.CallOption) (*AddBlockResponse, error) {
+func (c *workerClient) AddBlock(ctx context.Context, in *AddBlockRequest, opts ...grpc.CallOption) (*AddBlockResponse, error) {
 	out := new(AddBlockResponse)
-	err := grpc.Invoke(ctx, "/WorkerService/AddBlock", in, out, c.cc, opts...)
+	err := grpc.Invoke(ctx, "/Worker/AddBlock", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for WorkerService service
+func (c *workerClient) SetValue(ctx context.Context, in *SetValueRequest, opts ...grpc.CallOption) (*SetValueResponse, error) {
+	out := new(SetValueResponse)
+	err := grpc.Invoke(ctx, "/Worker/SetValue", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
-type WorkerServiceServer interface {
+// Server API for Worker service
+
+type WorkerServer interface {
 	AddBlock(context.Context, *AddBlockRequest) (*AddBlockResponse, error)
+	SetValue(context.Context, *SetValueRequest) (*SetValueResponse, error)
 }
 
-func RegisterWorkerServiceServer(s *grpc.Server, srv WorkerServiceServer) {
-	s.RegisterService(&_WorkerService_serviceDesc, srv)
+func RegisterWorkerServer(s *grpc.Server, srv WorkerServer) {
+	s.RegisterService(&_Worker_serviceDesc, srv)
 }
 
-func _WorkerService_AddBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Worker_AddBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AddBlockRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WorkerServiceServer).AddBlock(ctx, in)
+		return srv.(WorkerServer).AddBlock(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/WorkerService/AddBlock",
+		FullMethod: "/Worker/AddBlock",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WorkerServiceServer).AddBlock(ctx, req.(*AddBlockRequest))
+		return srv.(WorkerServer).AddBlock(ctx, req.(*AddBlockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-var _WorkerService_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "WorkerService",
-	HandlerType: (*WorkerServiceServer)(nil),
+func _Worker_SetValue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetValueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkerServer).SetValue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/Worker/SetValue",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkerServer).SetValue(ctx, req.(*SetValueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _Worker_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "Worker",
+	HandlerType: (*WorkerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "AddBlock",
-			Handler:    _WorkerService_AddBlock_Handler,
+			Handler:    _Worker_AddBlock_Handler,
+		},
+		{
+			MethodName: "SetValue",
+			Handler:    _Worker_SetValue_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -145,15 +265,22 @@ var _WorkerService_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("service.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 145 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2d, 0x4e, 0x2d, 0x2a,
-	0xcb, 0x4c, 0x4e, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x57, 0xf2, 0xe6, 0xe2, 0x77, 0x4c, 0x49,
-	0x71, 0xca, 0xc9, 0x4f, 0xce, 0x0e, 0x4a, 0x2d, 0x2c, 0x4d, 0x2d, 0x2e, 0x11, 0x12, 0xe1, 0x62,
-	0x05, 0xf3, 0x25, 0x18, 0x15, 0x18, 0x35, 0x78, 0x82, 0x20, 0x1c, 0x21, 0x25, 0x2e, 0x9e, 0x80,
-	0xa2, 0xfc, 0x82, 0xfc, 0xe2, 0xcc, 0xbc, 0x74, 0x3f, 0x4f, 0x17, 0x09, 0x26, 0x05, 0x46, 0x0d,
-	0xce, 0x20, 0x14, 0x31, 0x25, 0x21, 0x2e, 0x01, 0x84, 0x61, 0xc5, 0x05, 0xf9, 0x79, 0xc5, 0xa9,
-	0x46, 0x0e, 0x5c, 0xbc, 0xe1, 0xf9, 0x45, 0xd9, 0xa9, 0x45, 0xc1, 0x10, 0x7b, 0x85, 0xf4, 0xb9,
-	0x38, 0x60, 0x8a, 0x84, 0x04, 0xf4, 0xd0, 0x2c, 0x97, 0x12, 0xd4, 0x43, 0x37, 0x21, 0x89, 0x0d,
-	0xec, 0x52, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x9c, 0xd5, 0xdb, 0xe4, 0xba, 0x00, 0x00,
-	0x00,
+	// 266 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x5c, 0x91, 0x4f, 0x4b, 0xc3, 0x40,
+	0x10, 0xc5, 0x89, 0xf9, 0xa3, 0x1d, 0x2a, 0xdd, 0x0e, 0x45, 0x96, 0xe2, 0xa1, 0xec, 0xa9, 0xa7,
+	0x15, 0xf4, 0xe4, 0xb1, 0xe2, 0x45, 0x0a, 0x25, 0x44, 0xd1, 0x73, 0xdb, 0x1d, 0xa4, 0xb6, 0x64,
+	0xe3, 0x6e, 0x22, 0x14, 0xfc, 0xf0, 0xb2, 0x9b, 0x84, 0xe0, 0xde, 0xe6, 0x0d, 0x79, 0xbf, 0xbc,
+	0x37, 0x0b, 0xd7, 0x96, 0xcc, 0xcf, 0x61, 0x4f, 0xb2, 0x32, 0xba, 0xd6, 0x62, 0x0d, 0x93, 0x95,
+	0x52, 0x4f, 0x27, 0xbd, 0x3f, 0x16, 0xf4, 0xdd, 0x90, 0xad, 0x71, 0x06, 0xa9, 0xd7, 0x3c, 0x5a,
+	0x44, 0xcb, 0x71, 0xd1, 0x0a, 0x14, 0x30, 0xce, 0x8d, 0xae, 0xb4, 0x3d, 0x94, 0x9f, 0x9b, 0x97,
+	0x67, 0x7e, 0xb1, 0x88, 0x96, 0xa3, 0xe2, 0xdf, 0x4e, 0x20, 0xb0, 0x01, 0x66, 0x2b, 0x5d, 0x5a,
+	0x12, 0xbf, 0x90, 0x6c, 0xb4, 0x22, 0x64, 0x10, 0x3b, 0x5b, 0xe4, 0x6d, 0x6e, 0x44, 0x0e, 0x97,
+	0x2b, 0xa5, 0x0c, 0x59, 0xdb, 0xc1, 0x7a, 0x89, 0x08, 0xc9, 0xdb, 0xb9, 0x22, 0x1e, 0xfb, 0xb5,
+	0x9f, 0xf1, 0x06, 0xb2, 0xbc, 0xd9, 0xad, 0xe9, 0xcc, 0x13, 0x1f, 0xab, 0x53, 0x78, 0x0b, 0xa3,
+	0x7c, 0x6b, 0xa8, 0xac, 0x1d, 0x3d, 0xf5, 0x86, 0x61, 0x21, 0x1e, 0x61, 0xf2, 0x4a, 0xf5, 0xfb,
+	0xf6, 0xd4, 0x50, 0x5f, 0x8f, 0x41, 0xec, 0x28, 0x5d, 0x10, 0x87, 0x98, 0x41, 0xea, 0xbf, 0xe8,
+	0x62, 0xb4, 0xc2, 0x95, 0x19, 0xac, 0x6d, 0x99, 0xfb, 0x2f, 0xc8, 0x3e, 0xb4, 0x39, 0x92, 0xc1,
+	0x3b, 0xb8, 0xea, 0xab, 0x22, 0x93, 0xc1, 0x09, 0xe7, 0x53, 0x19, 0xde, 0xc1, 0x19, 0x7a, 0x1c,
+	0x32, 0x19, 0x84, 0x9a, 0x4f, 0x65, 0xf8, 0xaf, 0x5d, 0xe6, 0x1f, 0xe8, 0xe1, 0x2f, 0x00, 0x00,
+	0xff, 0xff, 0xab, 0xf1, 0xda, 0xce, 0xb1, 0x01, 0x00, 0x00,
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"strings"
 
@@ -37,9 +36,10 @@ func StartMaster() {
 
 	startWorkers(app)
 
-	go startHTTPServer(app)
+	addrParts := strings.Split(app.Self.Address, ":")
+	port := addrParts[len(addrParts)-1]
 
-	lis, err := net.Listen("tcp", ":4000")
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -51,18 +51,6 @@ func StartMaster() {
 
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
-	}
-}
-
-func startHTTPServer(app *config.App) {
-	router := router(app)
-
-	addrParts := strings.Split(app.Self.Address, ":")
-	port := addrParts[len(addrParts)-1]
-
-	logger.LogInfo(fmt.Sprintf("starting astrocache master node server on port %q\n", port))
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), router); err != nil {
-		log.Fatal(err)
 	}
 }
 

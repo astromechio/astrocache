@@ -112,6 +112,9 @@ func addWorkerNode(app *config.App, node *model.Node) (*NewNodeResponse, error) 
 		return nil, err
 	}
 
+	verifier := app.NodeList.RandomVerifier()
+	node.ParentNID = verifier.NID
+
 	nodeAddedAction := actions.NewNodeAdded(node, encGlobalKey)
 	actionJSON := nodeAddedAction.JSON()
 
@@ -144,10 +147,7 @@ func addWorkerNode(app *config.App, node *model.Node) (*NewNodeResponse, error) 
 	}
 
 	protoMaster := ProtoNodeFromNode(app.Self)
-
-	verifier := app.NodeList.RandomVerifier()
 	protoVerifier := ProtoNodeFromNode(verifier)
-	node.ParentNID = verifier.NID
 
 	resp := &NewNodeResponse{
 		EncGlobalKey: encGlobalKeyJSON,

@@ -14,7 +14,7 @@ func AddBlockHandler(app *config.App, req *AddBlockRequest) (*AddBlockResponse, 
 	var err error
 	chain := app.Chain
 
-	var block *blockchain.Block
+	block := &blockchain.Block{}
 	if err := json.Unmarshal(req.Block, block); err != nil {
 		err = errors.Wrap(err, "AddBlockHandler failed to Unmarshal")
 		return nil, err

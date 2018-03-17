@@ -2,7 +2,6 @@ package model
 
 import (
 	"crypto/rand"
-	"strings"
 
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/pkg/errors"
@@ -51,12 +50,8 @@ func (n *Node) Dial() (*grpc.ClientConn, error) {
 		return n.Conn, nil
 	}
 
-	// TODO: remove this hack
-	addr := strings.Split(n.Address, ":")[0]
-	addr = addr + ":4000"
-
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(n.Address, grpc.WithInsecure())
 	if err != nil {
 		return nil, errors.Wrap(err, "Dial failed to grpc.Dial")
 	}

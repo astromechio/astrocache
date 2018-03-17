@@ -23,9 +23,9 @@ func main() {
 		&model.Node{
 			Address: "localhost:3005",
 		},
-		// &model.Node{
-		// 	Address: "localhost:3006",
-		// },
+		&model.Node{
+			Address: "localhost:3006",
+		},
 		// &model.Node{
 		// 	Address: "localhost:3007",
 		// },
@@ -39,7 +39,7 @@ func main() {
 
 	start := time.Now()
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 1; i++ {
 		valSet = reloadVals(valSet)
 
 		setAllVals(valSet, nodes)
@@ -89,7 +89,7 @@ func setVal(key, val string, node *model.Node, result chan error) {
 		Value: val,
 	}
 
-	if err := send.SetValue(setValRequest, node); err != nil {
+	if err := send.SetValueOnWorker(setValRequest, node); err != nil {
 		result <- err
 	}
 
@@ -160,7 +160,7 @@ func randomString() string {
 func loadVals() map[string]string {
 	newSet := make(map[string]string)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 2000; i++ {
 		key := randomString()
 		val := randomString()
 

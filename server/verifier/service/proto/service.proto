@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+service Verifier {
+	rpc ProposeBlock(ProposeBlockRequest) returns (ProposeBlockResponse);
+	rpc SetValue(SetValueRequest) returns (SetValueResponse);
+}
+
+message ProposeBlockRequest {
+	bytes Block = 1;
+	string ProposingNID = 2;
+}
+
+message ProposeBlockResponse {}
+
+message SetValueRequest {
+	string Key = 1;
+	string Value = 2;
+}
+
+message SetValueResponse {}
