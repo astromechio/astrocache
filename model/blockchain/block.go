@@ -11,7 +11,7 @@ import (
 
 // GenesisBlockID and others are block related consts
 const (
-	genesisBlockID = "iamthegenesisbutnottheterminator"
+	GenesisBlockID = "iamthegenesisbutnottheterminator"
 )
 
 // Notes:
@@ -50,7 +50,7 @@ func genesisBlockWithData(encKey *acrypto.SymKey, data []byte, actionType string
 
 	block.ActionType = actionType
 
-	block.ID = genesisBlockID
+	block.ID = GenesisBlockID
 
 	return block, nil
 }
@@ -75,7 +75,7 @@ func (b *Block) PrepareForCommit(sigKey *acrypto.KeyPair, prev *Block) error {
 	prevID := ""
 
 	if prev == nil {
-		if b.ID != genesisBlockID {
+		if b.ID != GenesisBlockID {
 			return errors.New("PrepareForCommit tried to prepare a non-genesis block with a nil prev")
 		}
 
@@ -83,7 +83,7 @@ func (b *Block) PrepareForCommit(sigKey *acrypto.KeyPair, prev *Block) error {
 			return fmt.Errorf("PrepareForCommit attempted to prepare a genesis block with a non-master keyPair with KID %q", sigKey.KID)
 		}
 
-		signingBody = append([]byte(genesisBlockID), b.Data.Data...)
+		signingBody = append([]byte(GenesisBlockID), b.Data.Data...)
 		newID = b.ID
 	} else {
 		prevHash, err := prev.Hash()
@@ -124,12 +124,12 @@ func (b *Block) Verify(keySet *acrypto.KeySet, prev *Block) error {
 			return fmt.Errorf("Verify attempted to verify genesis block with non-master keyPair with KID %q", sigKey.KID)
 		}
 
-		if b.ID != genesisBlockID {
+		if b.ID != GenesisBlockID {
 			return errors.New("Verify attempted to verify non-genesis block with nil prev block")
 		}
 
-		signingBody = append([]byte(genesisBlockID), b.Data.Data...)
-		newID = genesisBlockID
+		signingBody = append([]byte(GenesisBlockID), b.Data.Data...)
+		newID = GenesisBlockID
 	} else {
 		// we can say this is fine because the commit worker will skip duplicates
 		if b.IsSameAsBlock(prev) {

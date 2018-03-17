@@ -23,9 +23,9 @@ func main() {
 		&model.Node{
 			Address: "localhost:3005",
 		},
-		&model.Node{
-			Address: "localhost:3006",
-		},
+		// &model.Node{
+		// 	Address: "localhost:3006",
+		// },
 		// &model.Node{
 		// 	Address: "localhost:3007",
 		// },
@@ -39,15 +39,7 @@ func main() {
 
 	start := time.Now()
 
-	for i := 0; i < 5; i++ {
-		valSet = reloadVals(valSet)
-
-		setAllVals(valSet, nodes)
-	}
-
-	//checkAllVals(valSet, nodes)
-
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 20; i++ {
 		valSet = reloadVals(valSet)
 
 		setAllVals(valSet, nodes)

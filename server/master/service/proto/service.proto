@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+service Master {
+	rpc RequestReservedID (ReserveIDRequest) returns (ReserveIDResponse);
+	rpc AddNode (NewNodeRequest) returns (NewNodeResponse);
+	rpc GetChain (GetChainRequest) returns (GetChainResponse);
+	rpc AddBlock (AddBlockRequest) returns (AddBlockResponse);
+}
+
+message ReserveIDRequest {
+	string ProposingNID = 1;
+}
+
+message ReserveIDResponse {
+	string BlockID = 1;
+}
+
+message NewNodeRequest {
+	Node Node = 1;
+	string JoinCode = 2;
+}
+
+message NewNodeResponse {
+	bytes EncGlobalKey = 1;
+	Node Master = 2;
+	Node Verifier = 3;
+	bool IsPrimary = 4;
+}
+
+message GetChainRequest {
+	string After = 1;
+}
+
+message GetChainResponse {
+	bytes Blocks = 1;
+}
+
+message AddBlockRequest {
+	bytes Block = 1;
+	string ProposingNID = 2;
+}
+
+message AddBlockResponse {}
+
+// Node defines a node in the network
+message Node {
+	string NID = 1;
+	string Address = 2;
+	string Type = 3;
+	bytes PubKey = 4;
+	string ParentNID = 5;
+}

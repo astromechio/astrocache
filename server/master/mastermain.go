@@ -4,18 +4,21 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/astromechio/astrocache/cache"
 	"github.com/astromechio/astrocache/model/actions"
+	"google.golang.org/grpc"
 
 	"github.com/astromechio/astrocache/config"
 	acrypto "github.com/astromechio/astrocache/crypto"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
+	"github.com/astromechio/astrocache/server/master/service"
 	"github.com/astromechio/astrocache/workers"
 	"github.com/pkg/errors"
 )
@@ -34,6 +37,24 @@ func StartMaster() {
 
 	startWorkers(app)
 
+	go startHTTPServer(app)
+
+	lis, err := net.Listen("tcp", ":4000")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+
+	server := &service.MasterService{App: app}
+	service.RegisterMasterServer(s, server)
+
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
+}
+
+func startHTTPServer(app *config.App) {
 	router := router(app)
 
 	addrParts := strings.Split(app.Self.Address, ":")

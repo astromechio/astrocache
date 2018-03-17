@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+service WorkerService {
+	rpc AddBlock (AddBlockRequest) returns (AddBlockResponse);
+}
+
+message AddBlockRequest {
+	bytes Block = 1;
+	string ProposingNID = 2;
+}
+
+message AddBlockResponse {}

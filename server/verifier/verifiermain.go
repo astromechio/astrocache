@@ -93,12 +93,13 @@ func generateConfig() (*config.App, error) {
 		NodeList: &config.NodeList{},
 	}
 
-	newNode, err := send.JoinNetwork(app, masterAddr, joinCode)
+	tempMaster := &model.Node{Address: masterAddr}
+	newNodeResp, err := send.JoinNetwork(app, tempMaster, joinCode)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to JoinNetwork")
 	}
 
-	globalKeyJSON, err := keyPair.Decrypt(newNode.EncGlobalKey)
+	globalKeyJSON, err := keyPair.Decrypt(newNodeResp.EncGlobalKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to Decrypt")
 	}
@@ -110,15 +111,15 @@ func generateConfig() (*config.App, error) {
 
 	app.KeySet.GlobalKey = globalKey
 
-	masterKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNode.Master.PubKey)
+	masterKeyPair, err := acrypto.KeyPairFromPubKeyJSON(newNodeResp.Master.PubKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to KeyPairFromPubKeyJSON")
 	}
 
 	app.KeySet.AddKeyPair(masterKeyPair)
-	app.NodeList.Master = newNode.Master
+	app.NodeList.Master = newNodeResp.Master
 
-	if newNode.IsPrimary {
+	if newNodeResp.IsPrimary {
 		logger.LogInfo("acting as primary verifier")
 		app.NodeList.Master.ParentNID = app.Self.NID
 	}

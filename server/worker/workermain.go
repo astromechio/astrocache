@@ -92,7 +92,8 @@ func generateConfig() (*config.App, error) {
 		NodeList: &config.NodeList{},
 	}
 
-	newNode, err := send.JoinNetwork(app, masterAddr, joinCode)
+	masterTemp := &model.Node{Address: masterAddr}
+	newNode, err := send.JoinNetwork(app, masterTemp, joinCode)
 	if err != nil {
 		return nil, errors.Wrap(err, "generateConfig failed to JoinNetwork")
 	}

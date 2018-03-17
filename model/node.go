@@ -2,8 +2,11 @@ package model
 
 import (
 	"crypto/rand"
+	"strings"
 
 	acrypto "github.com/astromechio/astrocache/crypto"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 // NodeTypeMaster and others represent node types
@@ -15,11 +18,12 @@ const (
 
 // Node defines a node in the network
 type Node struct {
-	NID       string `json:"nid"`
-	Address   string `json:"address"`
-	Type      string `json:"type"`
-	PubKey    []byte `json:"pubKey"`
-	ParentNID string `json:"parentNid,omitempty"`
+	NID       string           `json:"nid"`
+	Address   string           `json:"address"`
+	Type      string           `json:"type"`
+	PubKey    []byte           `json:"pubKey"`
+	ParentNID string           `json:"parentNid,omitempty"`
+	Conn      *grpc.ClientConn `json:"-"`
 }
 
 // NewNode creates a new node
@@ -39,6 +43,27 @@ func NewNode(addr, nodeType string, keyPair *acrypto.KeyPair) *Node {
 // KeyPair returns the node's pubKey
 func (n *Node) KeyPair() (*acrypto.KeyPair, error) {
 	return acrypto.KeyPairFromPubKeyJSON(n.PubKey)
+}
+
+// Dial configures the node's grpc connection
+func (n *Node) Dial() (*grpc.ClientConn, error) {
+	if n.Conn != nil {
+		return n.Conn, nil
+	}
+
+	// TODO: remove this hack
+	addr := strings.Split(n.Address, ":")[0]
+	addr = addr + ":4000"
+
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	if err != nil {
+		return nil, errors.Wrap(err, "Dial failed to grpc.Dial")
+	}
+
+	n.Conn = conn
+
+	return conn, nil
 }
 
 func generateNewNID() string {
