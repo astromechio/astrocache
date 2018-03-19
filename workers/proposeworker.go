@@ -36,10 +36,10 @@ func ProposeWorker(app *config.App) {
 		if app.Self.Type != model.NodeTypeWorker {
 			select {
 			case reserveJob = <-chain.ReservedChan:
-				logger.LogInfo("PoposeWorker got reserved block job")
+				logger.LogDebug("PoposeWorker got reserved block job")
 
 				blockJob = <-chain.ProposeChan
-				logger.LogInfo("ProposeWorker got proposed block job")
+				logger.LogDebug("ProposeWorker got proposed block job")
 
 				if err := proposeBlock(blockJob, app); err != nil {
 					blockJob.ResultChan <- errors.Wrap(err, "ProposeWorker failed to proposeBlock")
@@ -56,11 +56,12 @@ func ProposeWorker(app *config.App) {
 				}
 
 			case blockJob = <-chain.VerifyChan:
-				logger.LogInfo("ProposeWorker got verify block job")
+				logger.LogDebug("ProposeWorker got verify block job")
 
 				if reserveJob != nil && blockJob.Block.ID != reserveJob.BlockID {
-					logger.LogError(fmt.Errorf("ProposeWorker failed before verifyBlock, block.ID did not match reserved.BlockID"))
-					blockJob.ResultChan <- fmt.Errorf("ProposeWorker failed before verifyBlock, block.ID did not match reserved.BlockID")
+					err := fmt.Errorf("ProposeWorker failed before verifyBlock, block.ID (%s) did not match reserved.BlockID (%s)", blockJob.Block.ID, reserveJob.BlockID)
+					logger.LogError(err)
+					blockJob.ResultChan <- err
 					chain.Proposed = nil
 
 					continue
@@ -74,20 +75,21 @@ func ProposeWorker(app *config.App) {
 		}
 
 		// Send the block to be committed
-		logger.LogInfo("ProposeWorker sending blockJob to be committed")
+		logger.LogDebug("ProposeWorker sending blockJob to be committed")
 
 		select {
 		case <-chain.CommittedChan:
-			logger.LogInfo("")
+			logger.LogDebug("ProposeWorker drained CommittedChan before sending blockJob to be committed")
 		default:
 			// we want to clear out CommittedChan in case the ReserveWorker is busy
 		}
 
 		chain.CommitChan <- blockJob
-		logger.LogInfo("ProposeWorker sent blockJob to be committed")
+		logger.LogDebug("ProposeWorker sent blockJob to be committed")
 
 		if app.Self.Type == model.NodeTypeWorker {
 			// workers will wait in the committed loop
+			logger.LogDebug("ProposeWorker waiting for Committed notif")
 			<-chain.CommittedChan
 		}
 	}

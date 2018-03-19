@@ -47,7 +47,7 @@ func ActionWorker(app *config.App) {
 			continue
 		}
 
-		logger.LogInfo("executing action (type " + action.ActionType() + ") from block with ID " + block.ID)
+		logger.LogDebug("executing action (type " + action.ActionType() + ") from block with ID " + block.ID)
 
 		if err := action.Execute(app); err != nil {
 			logger.LogError(errors.Wrap(err, "ActionWorker failed to Execute for block with ID "+block.ID))

@@ -3,15 +3,12 @@ package main
 import (
 	"crypto/rand"
 	"fmt"
-	"io/ioutil"
 	mrand "math/rand"
-	"net/http"
 	"time"
 
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/requests"
 	"github.com/astromechio/astrocache/send"
-	"github.com/astromechio/astrocache/transport"
 
 	acrypto "github.com/astromechio/astrocache/crypto"
 )
@@ -96,59 +93,59 @@ func setVal(key, val string, node *model.Node, result chan error) {
 	result <- nil
 }
 
-func checkAllVals(valSet map[string]string, nodes []*model.Node) {
-	resultChan := make(chan error)
-	count := 0
-	numFailed := 0
-	numSucceeded := 0
+// func checkAllVals(valSet map[string]string, nodes []*model.Node) {
+// 	resultChan := make(chan error)
+// 	count := 0
+// 	numFailed := 0
+// 	numSucceeded := 0
 
-	for key, val := range valSet {
-		index := mrand.Intn(len(nodes))
-		node := nodes[index]
+// 	for key, val := range valSet {
+// 		index := mrand.Intn(len(nodes))
+// 		node := nodes[index]
 
-		count++
-		go checkVal(key, val, node, resultChan)
-	}
+// 		count++
+// 		go checkVal(key, val, node, resultChan)
+// 	}
 
-	for true {
-		if err := <-resultChan; err != nil {
-			fmt.Println(err.Error())
-			numFailed++
-		} else {
-			numSucceeded++
-		}
+// 	for true {
+// 		if err := <-resultChan; err != nil {
+// 			fmt.Println(err.Error())
+// 			numFailed++
+// 		} else {
+// 			numSucceeded++
+// 		}
 
-		if numFailed+numSucceeded == count {
-			break
-		}
-	}
+// 		if numFailed+numSucceeded == count {
+// 			break
+// 		}
+// 	}
 
-	fmt.Printf("Got %d values with %d successes and %d failures\n", count, numSucceeded, numFailed)
-}
+// 	fmt.Printf("Got %d values with %d successes and %d failures\n", count, numSucceeded, numFailed)
+// }
 
-func checkVal(key, val string, node *model.Node, result chan error) {
-	url := transport.URLFromAddressAndPath(node.Address, "v1/value/"+key)
+// func checkVal(key, val string, node *model.Node, result chan error) {
+// 	url := transport.URLFromAddressAndPath(node.Address, "v1/value/"+key)
 
-	req, _ := http.NewRequest(http.MethodGet, url, nil)
+// 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 
-	res, err := transport.HttpClient().Do(req)
-	if err != nil {
-		result <- err
-	}
+// 	res, err := transport.HttpClient().Do(req)
+// 	if err != nil {
+// 		result <- err
+// 	}
 
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		result <- err
-	}
-	defer res.Body.Close()
+// 	body, err := ioutil.ReadAll(res.Body)
+// 	if err != nil {
+// 		result <- err
+// 	}
+// 	defer res.Body.Close()
 
-	gotVal := string(body)
-	if gotVal != val {
-		result <- fmt.Errorf("Got %q, shold be %q", gotVal, val)
-	}
+// 	gotVal := string(body)
+// 	if gotVal != val {
+// 		result <- fmt.Errorf("Got %q, shold be %q", gotVal, val)
+// 	}
 
-	result <- nil
-}
+// 	result <- nil
+// }
 
 func randomString() string {
 	bytes := make([]byte, 10)

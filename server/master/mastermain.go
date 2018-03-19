@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/astromechio/astrocache/cache"
+	"github.com/astromechio/astrocache/flag"
 	"github.com/astromechio/astrocache/model/actions"
 	"google.golang.org/grpc"
 
@@ -62,11 +63,13 @@ func startWorkers(app *config.App) {
 }
 
 func generateConfig() (*config.App, error) {
-	if len(os.Args) < 3 {
+	args := flag.ArgsNoFlags(os.Args)
+
+	if len(args) < 3 {
 		return nil, errors.New("missing argument: address")
 	}
 
-	address := os.Args[2]
+	address := args[2]
 	if strings.Index(address, ":") < 0 {
 		return nil, errors.New("address does not contain port value")
 	}

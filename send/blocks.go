@@ -34,7 +34,7 @@ func ProposeBlockToVerifiers(block *blockchain.Block, verifiers []*model.Node, t
 		return nil
 	}
 
-	logger.LogInfo(fmt.Sprintf("ProposeBlockToVerifiers verifying block with %d verifiers", len(verifiers)))
+	logger.LogDebug(fmt.Sprintf("ProposeBlockToVerifiers verifying block with %d verifiers", len(verifiers)))
 
 	resultChan := make(chan bool, len(verifiers))
 
@@ -59,7 +59,7 @@ func ProposeBlockToVerifiers(block *blockchain.Block, verifiers []*model.Node, t
 		}
 	}
 
-	logger.LogInfo(fmt.Sprintf("ProposeBlockToVerifiers got %d matches and %d mismatches", numMatch, numMismatch))
+	logger.LogDebug(fmt.Sprintf("ProposeBlockToVerifiers got %d matches and %d mismatches", numMatch, numMismatch))
 
 	if numMismatch > 0 {
 		return fmt.Errorf("ProposeBlockToVerifiers failed to add pending block: %d verifiers reported ID mismatch", numMismatch)

@@ -10,6 +10,7 @@ import (
 	"github.com/astromechio/astrocache/cache"
 	"github.com/astromechio/astrocache/config"
 	acrypto "github.com/astromechio/astrocache/crypto"
+	"github.com/astromechio/astrocache/flag"
 	"github.com/astromechio/astrocache/logger"
 	"github.com/astromechio/astrocache/model"
 	"github.com/astromechio/astrocache/model/blockchain"
@@ -59,26 +60,28 @@ func startWorkers(app *config.App) {
 }
 
 func generateConfig() (*config.App, error) {
-	if len(os.Args) < 3 {
+	args := flag.ArgsNoFlags(os.Args)
+
+	if len(args) < 3 {
 		return nil, errors.New("missing argument: address")
 	}
 
-	if len(os.Args) < 4 {
+	if len(args) < 4 {
 		return nil, errors.New("missing argument: master node address")
 	}
 
-	if len(os.Args) < 5 {
+	if len(args) < 5 {
 		return nil, errors.New("missing argument: join code")
 	}
 
-	address := os.Args[2]
+	address := args[2]
 	if strings.Index(address, ":") < 0 {
 		return nil, errors.New("address does not contain port value")
 	}
 
-	masterAddr := os.Args[3]
+	masterAddr := args[3]
 
-	joinCode := os.Args[4]
+	joinCode := args[4]
 
 	keyPair, err := acrypto.GenerateNewKeyPair()
 	if err != nil {

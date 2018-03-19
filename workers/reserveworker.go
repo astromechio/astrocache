@@ -31,29 +31,30 @@ func ReserveWorker(app *config.App) {
 
 		select {
 		case reserveJob = <-chain.ReserveChan:
-			logger.LogInfo("ReserveWorker got reserve job")
+			logger.LogDebug("ReserveWorker got reserve job")
 		case <-chain.CommittedChan:
-			logger.LogInfo("ReserveWorker saw committed message, continuing...")
+			logger.LogDebug("ReserveWorker saw committed message, continuing...")
 			continue
 		}
 
 		if app.Self.Type == model.NodeTypeVerifier {
 			reservedID, err := send.RequestReservedID(app.NodeList.Master, app.Self.NID)
 			if err != nil {
-				logger.LogError(errors.Wrap(err, "ReserveWorker failed to RequesReservedID"))
-				reserveJob.ResultChan <- errors.Wrap(err, "ReserveWorker failed to RequesReservedID")
+				err = errors.Wrap(err, "ReserveWorker failed to RequesReservedID")
+				logger.LogError(err)
+				reserveJob.ResultChan <- err
 				continue
 			}
 
 			reserveJob.BlockID = reservedID.BlockID
 
-			logger.LogInfo(fmt.Sprintf("ReserveWorker got reserved block ID %s, sending reserved message", reserveJob.BlockID))
+			logger.LogInfo(fmt.Sprintf("ReserveWorker reserved block ID %s", reserveJob.BlockID))
 			chain.ReservedChan <- reserveJob
 
-			logger.LogInfo("ReserveWorker sending job result")
+			logger.LogDebug("ReserveWorker sending job result")
 			reserveJob.ResultChan <- nil
 
-			logger.LogInfo("ReserveWorker finished job, waiting for committed")
+			logger.LogDebug("ReserveWorker finished job, waiting for committed")
 			<-chain.CommittedChan
 
 		} else {
@@ -61,8 +62,9 @@ func ReserveWorker(app *config.App) {
 
 			hash, err := last.Hash()
 			if err != nil {
-				logger.LogError(errors.Wrap(err, "ReserveWorker failed to last.Hash()"))
-				reserveJob.ResultChan <- errors.Wrap(err, "ReserveWorker failed to last.Hash()")
+				err = errors.Wrap(err, "ReserveWorker failed to last.Hash()")
+				logger.LogError(err)
+				reserveJob.ResultChan <- err
 				continue
 			}
 
@@ -70,24 +72,25 @@ func ReserveWorker(app *config.App) {
 
 			reserveJob.BlockID = newID
 
-			logger.LogInfo(fmt.Sprintf("ReserveWorker reserved block with ID %s", newID))
+			logger.LogInfo(fmt.Sprintf("ReserveWorker reserved block ID %s", newID))
 
 			if reserveJob.ProposingNID == app.Self.NID {
 				// if we are mining our own block
-				logger.LogInfo("ReserveWorker finished job with propNID of self, sending reserved message")
+				logger.LogDebug("ReserveWorker finished job with propNID of self, sending reserved message")
 				chain.ReservedChan <- reserveJob
 
-				logger.LogInfo("ReserveWorker sending job result")
+				logger.LogDebug("ReserveWorker sending job result")
 				reserveJob.ResultChan <- nil
 			} else {
-				logger.LogInfo("ReserveWorker sending job result")
+				logger.LogDebug("ReserveWorker sending job result")
 				reserveJob.ResultChan <- nil
 
-				logger.LogInfo("ReserveWorker finished job, waiting for committed or timeout")
+				// if we are reserving for another node, we want to wait for committed message before even trying to reserve a new block ID
+				logger.LogDebug("ReserveWorker finished job, waiting for committed or timeout")
 				select {
 				case <-chain.CommittedChan:
 				case <-time.After(time.Second * 2):
-					logger.LogInfo("ReserveWorker hit timeout waiting for committed, assuming failed")
+					logger.LogWarn("ReserveWorker hit timeout waiting for committed, assuming failed")
 				}
 			}
 		}

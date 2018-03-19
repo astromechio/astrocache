@@ -31,7 +31,7 @@ func CommitWorker(app *config.App) {
 	for true {
 		blockJob := <-chain.CommitChan
 
-		logger.LogInfo("CommitWorker got commit job")
+		logger.LogDebug("CommitWorker got commit job")
 
 		if blockJob.Block == nil {
 			logger.LogWarn("CommitWorker received nil block, continuing..")
@@ -39,8 +39,9 @@ func CommitWorker(app *config.App) {
 		}
 
 		if err := commitBlock(blockJob, app); err != nil {
-			logger.LogError(errors.Wrap(err, "CommitWorker failed to checkBlock"))
-			blockJob.ResultChan <- errors.Wrap(err, "CommitWorker failed to checkBlock")
+			err = errors.Wrap(err, "CommitWorker failed to checkBlock")
+			logger.LogError(err)
+			blockJob.ResultChan <- err
 
 			chain.Proposed = nil
 
@@ -54,16 +55,16 @@ func CommitWorker(app *config.App) {
 
 		chain.ActionChan <- blockJob.Block // send the block to be executed
 
-		logger.LogInfo("CommitWorker completed commit job, reporting committed")
+		logger.LogDebug("CommitWorker completed commit job, reporting committed")
 		chain.CommittedChan <- blockJob.Block // notify other goroutines that something was committed
-		logger.LogInfo("CommitWorker completed commit job, reported committed")
+		logger.LogDebug("CommitWorker completed commit job, reported committed")
 	}
 }
 
 func commitBlock(job *blockchain.NewBlockJob, app *config.App) error {
 	chain := app.Chain
 
-	logger.LogInfo(fmt.Sprintf("commitBlock committing block with ID %q", job.Block.ID))
+	logger.LogDebug(fmt.Sprintf("commitBlock committing block with ID %q", job.Block.ID))
 
 	if chain.Proposed == nil || !job.Block.IsSameAsBlock(chain.Proposed) {
 		return fmt.Errorf("commitBlock tried to commit a non-proposed block")
